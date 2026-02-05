@@ -186,18 +186,20 @@ async function fetchDispatch() {
         }
         
         // Merge new priority incidents with history
-        data.incidents.forEach(newInc => {
-            const exists = allIncidents.some(inc => 
-                inc['Call Time'] === newInc['Call Time'] && 
-                inc['Address'] === newInc['Address']
-            );
-            if (!exists) {
-                allIncidents.unshift(newInc);
-            }
-        });
+        if (data.incidents && Array.isArray(data.incidents)) {
+            data.incidents.forEach(newInc => {
+                const exists = allIncidents.some(inc => 
+                    inc['Call Time'] === newInc['Call Time'] && 
+                    inc['Address'] === newInc['Address']
+                );
+                if (!exists) {
+                    allIncidents.unshift(newInc);
+                }
+            });
+        }
         
         // Merge ALL incidents with unfiltered history
-        if (data.all_incidents) {
+        if (data.all_incidents && Array.isArray(data.all_incidents)) {
             data.all_incidents.forEach(newInc => {
                 const exists = allIncidentsUnfiltered.some(inc => 
                     inc['Call Time'] === newInc['Call Time'] && 
@@ -211,8 +213,8 @@ async function fetchDispatch() {
         
         // Add incident markers to map
         const incidentsToMap = showAllIncidents ? 
-            (showAllHistory ? allIncidentsUnfiltered : data.all_incidents) :
-            (showAllHistory ? allIncidents : data.incidents);
+            (showAllHistory ? allIncidentsUnfiltered : (data.all_incidents || [])) :
+            (showAllHistory ? allIncidents : (data.incidents || []));
         addIncidentMarkers(incidentsToMap);
         
         // Render table
@@ -336,6 +338,10 @@ function addIncidentMarkers(incidents) {
     // Clear old incident markers
     incidentMarkers.forEach(marker => map.removeLayer(marker));
     incidentMarkers = [];
+    
+    if (!incidents || !Array.isArray(incidents)) {
+        return;
+    }
     
     incidents.forEach(inc => {
         if (inc.has_location && inc.lat && inc.lon) {

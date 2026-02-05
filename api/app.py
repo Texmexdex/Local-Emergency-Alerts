@@ -103,8 +103,8 @@ def get_dispatch():
         r = requests.get(url, headers=HEADERS, timeout=15)
         r.raise_for_status()
         
-        soup = BeautifulSoup(r.text, 'html.parser')
-        tables = soup.find_all("table")
+        # Use pandas - it's better at handling messy tables
+        tables = pd.read_html(r.text)
         
         if not tables:
             return jsonify({
@@ -114,71 +114,84 @@ def get_dispatch():
                 "timestamp": datetime.utcnow().isoformat()
             })
         
-        # Find the main incident table (usually has the most rows)
-        target_table = max(tables, key=lambda t: len(t.find_all("tr")))
+        # Get the largest table
+        df = max(tables, key=lambda x: len(x))
         
-        # Parse rows manually to handle inconsistent columns
-        incidents = []
-        headers = []
-        rows = target_table.find_all("tr")
+        # Clean column names
+        df.columns = df.columns.astype(str)
         
-        for idx, row in enumerate(rows):
-            cols = row.find_all(["td", "th"])
-            row_data = [ele.text.strip() for ele in cols]
-            
-            # Skip empty rows
-            if not row_data or all(not cell for cell in row_data):
-                continue
-            
-            # First substantial row is headers
-            if idx == 0 or (not headers and 'Agency' in ' '.join(row_data)):
-                headers = row_data
-                continue
-            
-            # Skip disclaimer rows
-            if any(x in ' '.join(row_data).lower() for x in ['this page contains', 'disclaimer']):
-                continue
-            
-            # Skip if it's a repeated header
-            if row_data == headers:
-                continue
-            
-            # Create incident dict, padding with empty strings if needed
-            incident = {}
-            for i, header in enumerate(headers):
-                if i < len(row_data):
-                    incident[header] = row_data[i]
-                else:
-                    incident[header] = ''
-            
-            # Only add if it has meaningful data
-            if incident.get('Agency') and incident.get('Agency') != 'Agency':
-                incidents.append(incident)
+        # If first row looks like headers, use it
+        if 'Agency' not in df.columns and len(df) > 0:
+            if 'Agency' in str(df.iloc[0].values):
+                df.columns = df.iloc[0]
+                df = df[1:]
         
-        # Filter high-priority incidents
+        # Remove disclaimer rows
+        df = df[~df.astype(str).apply(lambda x: x.str.contains('This page contains|disclaimer', case=False, na=False)).any(axis=1)]
+        
+        # Ensure we have the right columns
+        expected_cols = ['Agency', 'Address', 'Cross Street', 'Key Map', 'Call Time', 'Incident Type', 'Combined Response']
+        
+        # If columns don't match, try to map them
+        if 'Agency' not in df.columns and len(df.columns) >= 7:
+            df.columns = expected_cols[:len(df.columns)]
+        
+        # Convert to dict
+        all_incidents_raw = df.to_dict('records')
+        
+        # Clean ALL incidents first
+        all_incidents_cleaned = []
+        for inc in all_incidents_raw:
+            # Skip if not a valid incident
+            agency = str(inc.get('Agency', ''))
+            if agency not in ['FD', 'PD']:
+                continue
+            
+            cleaned = {
+                'Agency': str(inc.get('Agency', '')),
+                'Address': str(inc.get('Address', '')),
+                'Cross Street': str(inc.get('Cross Street', '')),
+                'Key Map': str(inc.get('Key Map', '')),
+                'Call Time': str(inc.get('Call Time', '') or inc.get('Call Time(Opened)', '')),
+                'Incident Type': str(inc.get('Incident Type', '')),
+                'Combined Response': str(inc.get('Combined Response', 'N'))
+            }
+            
+            # Add geocoding
+            address = cleaned['Address']
+            key_map = cleaned['Key Map']
+            
+            if address and len(address) > 2 and address != 'nan':
+                cleaned['has_location'] = True
+                try:
+                    grid_num = int(''.join(filter(str.isdigit, key_map))) if key_map else 500
+                    # Houston grid system
+                    cleaned['lat'] = 29.5 + (grid_num % 100) * 0.01
+                    cleaned['lon'] = -95.6 + (grid_num // 100) * 0.1
+                except:
+                    cleaned['lat'] = 29.76
+                    cleaned['lon'] = -95.36
+            else:
+                cleaned['has_location'] = False
+            
+            all_incidents_cleaned.append(cleaned)
+        
+        # Filter high-priority incidents from cleaned list
         keywords = ['SHELDON', 'BAYWAY', 'DECKER', 'CHANNELVIEW', 'PASADENA', 
                    'FIRE', 'HAZMAT', 'LYONDELL', 'EXXON', 'INDUSTRIAL', 'CHEMICAL',
-                   'REFINERY', 'PLANT', 'EXPLOSION', 'LEAK', 'SMOKE', 'ODOR']
+                   'REFINERY', 'PLANT', 'EXPLOSION', 'LEAK', 'SMOKE', 'ODOR', 'APARTMENT',
+                   'HOUSE', 'ALARM', 'CRASH', 'MAJOR']
         
         priority_incidents = []
-        for inc in incidents:
+        for inc in all_incidents_cleaned:
             text = ' '.join(str(v) for v in inc.values()).upper()
             if any(kw in text for kw in keywords):
-                # Add geocoding for incidents with addresses
-                address = inc.get('Address') or inc.get('Location') or inc.get('Block') or ''
-                if address and len(str(address).strip()) > 3:
-                    inc['has_location'] = True
-                    # Rough geocoding based on address hash (for demo)
-                    inc['lat'] = 29.76 + (abs(hash(str(address))) % 100) / 1000
-                    inc['lon'] = -95.36 + (abs(hash(str(address))) % 100) / 1000
-                else:
-                    inc['has_location'] = False
-                
                 priority_incidents.append(inc)
         
         return jsonify({
             "incidents": priority_incidents,
-            "total_incidents": len(incidents),
+            "all_incidents": all_incidents_cleaned,
+            "total_incidents": len(all_incidents_cleaned),
             "priority_count": len(priority_incidents),
             "timestamp": datetime.utcnow().isoformat()
         })
@@ -229,6 +242,37 @@ def health():
         "status": "operational",
         "timestamp": datetime.utcnow().isoformat()
     })
+
+@app.route('/api/debug/dispatch', methods=['GET'])
+def debug_dispatch():
+    """Debug endpoint to see raw dispatch data"""
+    url = "https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx"
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=15)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        tables = soup.find_all("table")
+        
+        debug_info = {
+            "tables_found": len(tables),
+            "sample_rows": [],
+            "total_rows": 0
+        }
+        
+        if tables:
+            target_table = max(tables, key=lambda t: len(t.find_all("tr")))
+            rows = target_table.find_all("tr")
+            debug_info["total_rows"] = len(rows)
+            
+            # Get first 10 rows as sample
+            for row in rows[:10]:
+                cols = row.find_all(["td", "th"])
+                row_data = [ele.text.strip() for ele in cols]
+                if row_data:
+                    debug_info["sample_rows"].append(row_data)
+        
+        return jsonify(debug_info)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=7860)

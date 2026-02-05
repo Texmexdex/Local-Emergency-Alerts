@@ -243,6 +243,171 @@ def health():
         "timestamp": datetime.utcnow().isoformat()
     })
 
+@app.route('/api/tceq-emissions', methods=['GET'])
+def get_tceq_emissions():
+    """Fetch TCEQ air emission events for Houston/Harris County area"""
+    url = "https://www2.tceq.texas.gov/oce/eer/index.cfm?fuession=main.getDetails"
+    try:
+        # TCEQ emissions search page - scrape recent events
+        search_url = "https://www2.tceq.texas.gov/oce/eer/index.cfm"
+        params = {
+            'fuession': 'main.searchResults',
+            'county': 'HARRIS',
+            'dayRange': '7'
+        }
+        r = requests.get(search_url, params=params, headers=HEADERS, timeout=15)
+        soup = BeautifulSoup(r.text, 'html.parser')
+        
+        events = []
+        # Look for table rows with emission event data
+        tables = soup.find_all('table')
+        for table in tables:
+            rows = table.find_all('tr')
+            for row in rows[1:]:  # Skip header
+                cols = row.find_all(['td', 'th'])
+                if len(cols) >= 4:
+                    event = {
+                        'incident_number': cols[0].get_text(strip=True) if len(cols) > 0 else '',
+                        'facility': cols[1].get_text(strip=True) if len(cols) > 1 else '',
+                        'date': cols[2].get_text(strip=True) if len(cols) > 2 else '',
+                        'county': cols[3].get_text(strip=True) if len(cols) > 3 else '',
+                        'severity': 'warning'
+                    }
+                    # Filter for Houston area counties
+                    if event['county'].upper() in ['HARRIS', 'CHAMBERS', 'GALVESTON', 'BRAZORIA', 'LIBERTY']:
+                        # Check for critical keywords
+                        text = ' '.join([event['facility'], event.get('description', '')]).lower()
+                        if any(kw in text for kw in ['explosion', 'fire', 'evacuate', 'shelter']):
+                            event['severity'] = 'critical'
+                        events.append(event)
+        
+        return jsonify({
+            "events": events,
+            "count": len(events),
+            "source": "TCEQ Air Emission Event Reports",
+            "timestamp": datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "error": str(e),
+            "events": [],
+            "count": 0,
+            "timestamp": datetime.utcnow().isoformat()
+        }), 500
+
+@app.route('/api/weather-alerts', methods=['GET'])
+def get_weather_alerts():
+    """Fetch NWS active weather alerts for Harris County area"""
+    # TXZ213 = Harris County, TXZ214 = Galveston, TXZ212 = Chambers
+    zones = ['TXZ213', 'TXZ214', 'TXZ212', 'TXZ226', 'TXZ227']
+    try:
+        all_alerts = []
+        for zone in zones[:2]:  # Limit to reduce API calls
+            url = f"https://api.weather.gov/alerts/active?zone={zone}"
+            r = requests.get(url, headers={**HEADERS, 'Accept': 'application/geo+json'}, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                features = data.get('features', [])
+                for feature in features:
+                    props = feature.get('properties', {})
+                    alert = {
+                        'event': props.get('event', 'Unknown'),
+                        'headline': props.get('headline', ''),
+                        'description': props.get('description', '')[:500],
+                        'severity': props.get('severity', 'Unknown'),
+                        'urgency': props.get('urgency', 'Unknown'),
+                        'areas': props.get('areaDesc', ''),
+                        'effective': props.get('effective', ''),
+                        'expires': props.get('expires', '')
+                    }
+                    # Map NWS severity to our scale
+                    if alert['severity'] in ['Extreme', 'Severe']:
+                        alert['display_severity'] = 'critical'
+                    elif alert['severity'] == 'Moderate':
+                        alert['display_severity'] = 'warning'
+                    else:
+                        alert['display_severity'] = 'info'
+                    all_alerts.append(alert)
+        
+        return jsonify({
+            "alerts": all_alerts,
+            "count": len(all_alerts),
+            "source": "National Weather Service",
+            "timestamp": datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            "error": str(e),
+            "alerts": [],
+            "count": 0,
+            "timestamp": datetime.utcnow().isoformat()
+        }), 500
+
+@app.route('/api/radio-feeds', methods=['GET'])
+def get_radio_feeds():
+    """Return available Broadcastify radio scanner feeds for Houston area"""
+    feeds = [
+        {
+            "id": 11690,
+            "name": "Houston Fire - Digital",
+            "type": "fire",
+            "coverage": "HFD Dispatch",
+            "url": "https://www.broadcastify.com/listen/feed/11690",
+            "embed_url": "https://www.broadcastify.com/listen/feed/11690/web",
+            "keywords": ["FIRE", "SMOKE", "HAZMAT", "EXPLOSION", "CHEMICAL", "INDUSTRIAL"]
+        },
+        {
+            "id": 11689,
+            "name": "Houston PD - All Districts",
+            "type": "police",
+            "coverage": "HPD Citywide",
+            "url": "https://www.broadcastify.com/listen/feed/11689",
+            "embed_url": "https://www.broadcastify.com/listen/feed/11689/web",
+            "keywords": ["CRASH", "ROBBERY", "ASSAULT", "PURSUIT"]
+        },
+        {
+            "id": 14299,
+            "name": "HPD + Harris County Constables",
+            "type": "police",
+            "coverage": "HPD + Constables",
+            "url": "https://www.broadcastify.com/listen/feed/14299",
+            "embed_url": "https://www.broadcastify.com/listen/feed/14299/web",
+            "keywords": []
+        },
+        {
+            "id": 17398,
+            "name": "Harris County Sheriff Dispatch",
+            "type": "sheriff",
+            "coverage": "HCSO",
+            "url": "https://www.broadcastify.com/listen/feed/17398",
+            "embed_url": "https://www.broadcastify.com/listen/feed/17398/web",
+            "keywords": []
+        },
+        {
+            "id": 34687,
+            "name": "Harris County North",
+            "type": "multi",
+            "coverage": "Pct 4, Tomball, Humble, DPS",
+            "url": "https://www.broadcastify.com/listen/feed/34687",
+            "embed_url": "https://www.broadcastify.com/listen/feed/34687/web",
+            "keywords": ["CHANNELVIEW", "SHELDON", "CROSBY"]
+        },
+        {
+            "id": 28416,
+            "name": "Houston Fire Dispatch",
+            "type": "fire",
+            "coverage": "HFD Primary",
+            "url": "https://www.broadcastify.com/listen/feed/28416",
+            "embed_url": "https://www.broadcastify.com/listen/feed/28416/web",
+            "keywords": ["FIRE", "EMS", "RESCUE"]
+        }
+    ]
+    return jsonify({
+        "feeds": feeds,
+        "count": len(feeds),
+        "timestamp": datetime.utcnow().isoformat()
+    })
+
 @app.route('/api/debug/dispatch', methods=['GET'])
 def debug_dispatch():
     """Debug endpoint to see raw dispatch data"""
@@ -276,3 +441,4 @@ def debug_dispatch():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=7860)
+

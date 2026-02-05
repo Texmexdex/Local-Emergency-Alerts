@@ -1,3 +1,12 @@
+---
+title: Industrial Monitor API
+emoji: 🏭
+colorFrom: red
+colorTo: gray
+sdk: docker
+pinned: false
+---
+
 # Industrial Monitor API
 
 Flask backend for industrial safety monitoring dashboard.

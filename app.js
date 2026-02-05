@@ -1,6 +1,7 @@
 // Configuration
 const API_BASE_URL = 'https://texmexdex-local-emergency-alerts.hf.space/api';
 const REFRESH_INTERVAL = 30000; // 30 seconds
+const USE_MOCK_DATA = false; // Set to true for testing without backend
 
 let map;
 let markers = {};
@@ -129,19 +130,27 @@ async function fetchCAER() {
 async function fetchDispatch() {
     try {
         const response = await fetch(`${API_BASE_URL}/dispatch`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
         const data = await response.json();
         
+        console.log('Dispatch data:', data); // Debug log
+        
         if (data.error) {
+            console.error('Dispatch API error:', data.error);
             throw new Error(data.error);
         }
         
         const tbody = document.getElementById('dispatch-tbody');
         const countEl = document.getElementById('dispatch-count');
         
-        countEl.textContent = `${data.priority_count} PRIORITY INCIDENTS`;
+        countEl.textContent = `${data.priority_count || 0} PRIORITY INCIDENTS`;
         
-        if (data.incidents.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="loading">NO PRIORITY INCIDENTS</td></tr>';
+        if (!data.incidents || data.incidents.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="loading">NO PRIORITY INCIDENTS DETECTED</td></tr>';
             return;
         }
         
@@ -149,17 +158,18 @@ async function fetchDispatch() {
         addIncidentMarkers(data.incidents);
         
         tbody.innerHTML = data.incidents.map(inc => {
-            const time = inc['Call Time'] || inc['Time'] || '--';
-            const agency = inc['Agency'] || '--';
-            const type = inc['Incident Type'] || inc['Type'] || '--';
-            const location = inc['Address'] || inc['Location'] || '--';
+            // Try multiple possible column names
+            const time = inc['Call Time'] || inc['Time'] || inc['Call DateTime'] || inc['Incident Time'] || '--';
+            const agency = inc['Agency'] || inc['Department'] || '--';
+            const type = inc['Incident Type'] || inc['Type'] || inc['Problem'] || '--';
+            const location = inc['Address'] || inc['Location'] || inc['Block'] || '--';
             
             return `
                 <tr>
-                    <td>${escapeHtml(time)}</td>
-                    <td>${escapeHtml(agency)}</td>
-                    <td>${escapeHtml(type)}</td>
-                    <td>${escapeHtml(location)}</td>
+                    <td>${escapeHtml(String(time))}</td>
+                    <td>${escapeHtml(String(agency))}</td>
+                    <td>${escapeHtml(String(type))}</td>
+                    <td>${escapeHtml(String(location))}</td>
                 </tr>
             `;
         }).join('');
@@ -167,7 +177,7 @@ async function fetchDispatch() {
     } catch (error) {
         console.error('Dispatch fetch error:', error);
         document.getElementById('dispatch-tbody').innerHTML = 
-            '<tr><td colspan="4" class="error">DISPATCH FEED UNAVAILABLE</td></tr>';
+            `<tr><td colspan="4" class="error">DISPATCH FEED UNAVAILABLE: ${error.message}</td></tr>`;
         document.getElementById('dispatch-count').textContent = '0 PRIORITY INCIDENTS';
     }
 }

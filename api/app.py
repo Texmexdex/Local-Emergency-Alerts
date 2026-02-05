@@ -101,51 +101,79 @@ def get_dispatch():
     url = "https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx"
     try:
         r = requests.get(url, headers=HEADERS, timeout=15)
+        r.raise_for_status()
+        
         soup = BeautifulSoup(r.text, 'html.parser')
-        
         tables = soup.find_all("table")
-        if not tables:
-            return jsonify({"incidents": [], "count": 0})
         
+        if not tables:
+            return jsonify({
+                "incidents": [],
+                "total_incidents": 0,
+                "priority_count": 0,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        
+        # Find the main incident table (usually has the most rows)
         target_table = max(tables, key=lambda t: len(t.find_all("tr")))
-        data = []
+        
+        # Parse rows manually to handle inconsistent columns
+        incidents = []
+        headers = []
         rows = target_table.find_all("tr")
         
-        for row in rows:
+        for idx, row in enumerate(rows):
             cols = row.find_all(["td", "th"])
-            cols = [ele.text.strip() for ele in cols]
-            if len(cols) > 1:
-                data.append(cols)
-        
-        if not data:
-            return jsonify({"incidents": [], "count": 0})
-        
-        # Parse into structured data
-        if "Agency" in str(data[0]):
-            columns = data[0]
-            rows_data = data[1:]
-        else:
-            columns = [f"Col_{i}" for i in range(len(data[0]))]
-            rows_data = data
-        
-        df = pd.DataFrame(rows_data, columns=columns)
-        
-        # Clean up
-        if "Agency" in df.columns:
-            df = df[df["Agency"] != "Agency"]
-            df = df[~df["Agency"].astype(str).str.contains("This page contains", case=False, na=False)]
-        
-        # Convert to list of dicts
-        incidents = df.to_dict('records')
+            row_data = [ele.text.strip() for ele in cols]
+            
+            # Skip empty rows
+            if not row_data or all(not cell for cell in row_data):
+                continue
+            
+            # First substantial row is headers
+            if idx == 0 or (not headers and 'Agency' in ' '.join(row_data)):
+                headers = row_data
+                continue
+            
+            # Skip disclaimer rows
+            if any(x in ' '.join(row_data).lower() for x in ['this page contains', 'disclaimer']):
+                continue
+            
+            # Skip if it's a repeated header
+            if row_data == headers:
+                continue
+            
+            # Create incident dict, padding with empty strings if needed
+            incident = {}
+            for i, header in enumerate(headers):
+                if i < len(row_data):
+                    incident[header] = row_data[i]
+                else:
+                    incident[header] = ''
+            
+            # Only add if it has meaningful data
+            if incident.get('Agency') and incident.get('Agency') != 'Agency':
+                incidents.append(incident)
         
         # Filter high-priority incidents
         keywords = ['SHELDON', 'BAYWAY', 'DECKER', 'CHANNELVIEW', 'PASADENA', 
-                   'FIRE', 'HAZMAT', 'LYONDELL', 'EXXON', 'INDUSTRIAL']
+                   'FIRE', 'HAZMAT', 'LYONDELL', 'EXXON', 'INDUSTRIAL', 'CHEMICAL',
+                   'REFINERY', 'PLANT', 'EXPLOSION', 'LEAK', 'SMOKE', 'ODOR']
         
         priority_incidents = []
         for inc in incidents:
             text = ' '.join(str(v) for v in inc.values()).upper()
             if any(kw in text for kw in keywords):
+                # Add geocoding for incidents with addresses
+                address = inc.get('Address') or inc.get('Location') or inc.get('Block') or ''
+                if address and len(str(address).strip()) > 3:
+                    inc['has_location'] = True
+                    # Rough geocoding based on address hash (for demo)
+                    inc['lat'] = 29.76 + (abs(hash(str(address))) % 100) / 1000
+                    inc['lon'] = -95.36 + (abs(hash(str(address))) % 100) / 1000
+                else:
+                    inc['has_location'] = False
+                
                 priority_incidents.append(inc)
         
         return jsonify({
@@ -154,21 +182,43 @@ def get_dispatch():
             "priority_count": len(priority_incidents),
             "timestamp": datetime.utcnow().isoformat()
         })
+        
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "error": f"Network error: {str(e)}",
+            "incidents": [],
+            "total_incidents": 0,
+            "priority_count": 0,
+            "timestamp": datetime.utcnow().isoformat()
+        }), 500
     except Exception as e:
         return jsonify({
-            "error": str(e),
+            "error": f"Parse error: {str(e)}",
             "incidents": [],
-            "count": 0
+            "total_incidents": 0,
+            "priority_count": 0,
+            "timestamp": datetime.utcnow().isoformat()
         }), 500
 
 @app.route('/api/facilities', methods=['GET'])
 def get_facilities():
-    """Return facility coordinates"""
+    """Return facility coordinates for Houston Ship Channel industrial area"""
     facilities = {
         "LyondellBasell Channelview": {"lat": 29.8160, "lon": -95.1150, "type": "petrochemical"},
-        "ExxonMobil Baytown": {"lat": 29.7450, "lon": -95.0120, "type": "refinery"},
-        "Chevron Phillips": {"lat": 29.7400, "lon": -94.9850, "type": "chemical"},
-        "Home Base": {"lat": 29.8000, "lon": -95.1200, "type": "residence"}
+        "ExxonMobil Baytown Refinery": {"lat": 29.7450, "lon": -95.0120, "type": "refinery"},
+        "ExxonMobil Baytown Chemical": {"lat": 29.7520, "lon": -95.0050, "type": "chemical"},
+        "Chevron Phillips Cedar Bayou": {"lat": 29.7400, "lon": -94.9850, "type": "chemical"},
+        "Shell Deer Park": {"lat": 29.6700, "lon": -95.1280, "type": "refinery"},
+        "Valero Houston Refinery": {"lat": 29.7350, "lon": -95.2450, "type": "refinery"},
+        "Marathon Galveston Bay": {"lat": 29.7180, "lon": -95.0450, "type": "refinery"},
+        "Pasadena Refining": {"lat": 29.6910, "lon": -95.1580, "type": "refinery"},
+        "Air Liquide Channelview": {"lat": 29.8050, "lon": -95.1100, "type": "industrial_gas"},
+        "Arkema Crosby": {"lat": 29.9150, "lon": -95.0620, "type": "chemical"},
+        "Huntsman Petrochemical": {"lat": 29.7280, "lon": -95.0380, "type": "chemical"},
+        "Ineos Chocolate Bayou": {"lat": 29.2450, "lon": -95.2280, "type": "chemical"},
+        "Covestro Baytown": {"lat": 29.7380, "lon": -95.0180, "type": "chemical"},
+        "Enterprise Products": {"lat": 29.7620, "lon": -95.0850, "type": "storage"},
+        "Kinder Morgan Pasadena": {"lat": 29.6850, "lon": -95.1650, "type": "storage"}
     }
     return jsonify(facilities)
 

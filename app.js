@@ -55,18 +55,91 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Scanner toggle
     document.getElementById('scanner-toggle').addEventListener('click', () => {
+        const btn = document.getElementById('scanner-toggle');
+        const status = document.getElementById('scanner-status');
+        const container = document.getElementById('scanner-container');
         const channel = document.getElementById('scanner-channel').value;
-        if (channel === 'scanner-radio') {
-            window.open('https://play.google.com/store/apps/details?id=com.scannerradio', '_blank');
-        } else if (channel === '5-0-radio') {
-            window.open('https://www.5-0radio.com/', '_blank');
-        } else if (channel === 'police-scanner') {
-            window.open('https://www.policescanner.com/', '_blank');
-        } else if (channel === 'broadcastify-web') {
-            window.open('https://www.broadcastify.com/listen/ctid/2687', '_blank');
+        
+        if (!scannerLoaded) {
+            loadScanner(channel);
+            status.textContent = '⏸ HIDE';
+            btn.classList.add('playing');
+            scannerLoaded = true;
+        } else {
+            container.innerHTML = `
+                <div class="scanner-info">
+                    <div class="scanner-notice">
+                        Select a channel and click LOAD to start streaming
+                    </div>
+                    <div class="scanner-attribution">
+                        Audio from <a href="https://www.policescanner.com" target="_blank">PoliceScanner.com</a> & <a href="https://www.broadcastify.com" target="_blank">Broadcastify</a>
+                    </div>
+                </div>
+            `;
+            status.textContent = '▶ LOAD';
+            btn.classList.remove('playing');
+            scannerLoaded = false;
         }
     });
 });
+
+function loadScanner(channel) {
+    const container = document.getElementById('scanner-container');
+    
+    if (channel === 'policescanner-houston') {
+        // Try embedding PoliceScanner.com
+        container.innerHTML = `
+            <div class="scanner-info">
+                <iframe 
+                    src="https://www.policescanner.com/houston" 
+                    height="400" 
+                    width="100%" 
+                    frameborder="0"
+                    allow="autoplay"
+                    style="border: none; background: var(--bg-secondary);">
+                </iframe>
+                <div class="scanner-attribution" style="margin-top: 10px;">
+                    Audio from <a href="https://www.policescanner.com" target="_blank">PoliceScanner.com</a>
+                </div>
+            </div>
+        `;
+    } else if (channel === 'policescanner-harris') {
+        container.innerHTML = `
+            <div class="scanner-info">
+                <iframe 
+                    src="https://www.policescanner.com/harris-county" 
+                    height="400" 
+                    width="100%" 
+                    frameborder="0"
+                    allow="autoplay"
+                    style="border: none; background: var(--bg-secondary);">
+                </iframe>
+                <div class="scanner-attribution" style="margin-top: 10px;">
+                    Audio from <a href="https://www.policescanner.com" target="_blank">PoliceScanner.com</a>
+                </div>
+            </div>
+        `;
+    } else if (channel.startsWith('broadcastify-')) {
+        const feedId = channel.replace('broadcastify-', '');
+        container.innerHTML = `
+            <div class="scanner-info">
+                <div class="scanner-notice" style="margin-bottom: 10px;">
+                    Opening Broadcastify in new window...
+                </div>
+                <a href="https://www.broadcastify.com/listen/feed/${feedId}" 
+                   target="_blank" 
+                   class="scanner-link" 
+                   style="font-size: 12px; display: block; text-align: center; padding: 15px; border: 1px solid var(--accent-info);">
+                    Click here if window didn't open →
+                </a>
+                <div class="scanner-attribution" style="margin-top: 10px;">
+                    Audio from <a href="https://www.broadcastify.com" target="_blank">Broadcastify.com</a>
+                </div>
+            </div>
+        `;
+        window.open(`https://www.broadcastify.com/listen/feed/${feedId}`, '_blank', 'width=500,height=700');
+    }
+}
 
 // Initialize Leaflet Map
 function initMap() {

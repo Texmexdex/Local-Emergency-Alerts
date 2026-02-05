@@ -52,36 +52,22 @@
                     <h2 class="panel-title">LIVE SCANNER AUDIO</h2>
                     <div class="scanner-controls">
                         <select id="scanner-channel" class="scanner-select">
-                            <option value="scanner-radio">Scanner Radio App (Recommended)</option>
-                            <option value="5-0-radio">5-0 Radio Police Scanner</option>
-                            <option value="police-scanner">Police Scanner+ App</option>
-                            <option value="broadcastify-web">Broadcastify Web Player</option>
+                            <option value="policescanner-houston">Houston Fire/Police (PoliceScanner)</option>
+                            <option value="policescanner-harris">Harris County (PoliceScanner)</option>
+                            <option value="broadcastify-2687">Houston Fire Dispatch (External)</option>
+                            <option value="broadcastify-19380">Harris County Fire/EMS (External)</option>
                         </select>
                         <button class="scanner-btn" id="scanner-toggle">
-                            <span id="scanner-status">OPEN APP ↗</span>
+                            <span id="scanner-status">▶ LOAD</span>
                         </button>
                     </div>
                     <div class="scanner-player" id="scanner-container">
                         <div class="scanner-info">
-                            <div class="scanner-notice" style="margin-bottom: 15px;">
-                                <strong>Real-time scanner audio requires a mobile app or browser extension.</strong><br><br>
-                                Recommended options for live Houston emergency audio:
+                            <div class="scanner-notice">
+                                Select a channel and click LOAD to start streaming
                             </div>
-                            <div style="text-align: left; font-size: 11px; line-height: 1.8; color: var(--text-secondary);">
-                                <strong style="color: var(--accent-info);">Mobile Apps (Free):</strong><br>
-                                • Scanner Radio (iOS/Android) - Best for Houston<br>
-                                • 5-0 Radio Police Scanner (iOS/Android)<br>
-                                • Police Scanner+ (iOS/Android)<br><br>
-                                
-                                <strong style="color: var(--accent-info);">Web Options:</strong><br>
-                                • <a href="https://www.broadcastify.com/listen/ctid/2687" target="_blank" style="color: var(--accent-info);">Broadcastify Houston Feeds</a><br>
-                                • <a href="https://www.policescanner.com/" target="_blank" style="color: var(--accent-info);">PoliceScanner.com</a><br><br>
-                                
-                                <strong style="color: var(--accent-info);">Hardware Option:</strong><br>
-                                • SDR Dongle ($25) + SDR# software for direct radio reception
-                            </div>
-                            <div class="scanner-attribution" style="margin-top: 15px;">
-                                Scanner aggregation by <a href="https://www.broadcastify.com" target="_blank">Broadcastify</a>
+                            <div class="scanner-attribution">
+                                Audio from <a href="https://www.policescanner.com" target="_blank">PoliceScanner.com</a> & <a href="https://www.broadcastify.com" target="_blank">Broadcastify</a>
                             </div>
                         </div>
                     </div>

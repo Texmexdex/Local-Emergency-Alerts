@@ -7,8 +7,10 @@ let map;
 let markers = {};
 let incidentMarkers = [];
 let allIncidents = []; // Store all incidents for history
+let allIncidentsUnfiltered = []; // Store ALL incidents including non-priority
 let currentSort = 'time';
 let showAllHistory = false;
+let showAllIncidents = false;
 let scannerLoaded = false;
 
 // Initialize
@@ -40,8 +42,30 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDispatchTable();
     });
     
+    // Show all incidents toggle
+    document.getElementById('show-all-incidents').addEventListener('change', (e) => {
+        showAllIncidents = e.target.checked;
+        renderDispatchTable();
+        // Update map markers
+        const data = showAllIncidents ? 
+            (showAllHistory ? allIncidentsUnfiltered : allIncidentsUnfiltered.slice(0, 100)) :
+            (showAllHistory ? allIncidents : allIncidents.slice(0, 100));
+        addIncidentMarkers(data);
+    });
+    
     // Scanner toggle
-    document.getElementById('scanner-toggle').addEventListener('click', toggleScanner);
+    document.getElementById('scanner-toggle').addEventListener('click', () => {
+        const channel = document.getElementById('scanner-channel').value;
+        if (channel === 'scanner-radio') {
+            window.open('https://play.google.com/store/apps/details?id=com.scannerradio', '_blank');
+        } else if (channel === '5-0-radio') {
+            window.open('https://www.5-0radio.com/', '_blank');
+        } else if (channel === 'police-scanner') {
+            window.open('https://www.policescanner.com/', '_blank');
+        } else if (channel === 'broadcastify-web') {
+            window.open('https://www.broadcastify.com/listen/ctid/2687', '_blank');
+        }
+    });
 });
 
 // Initialize Leaflet Map
@@ -168,27 +192,43 @@ async function fetchDispatch() {
         }
         
         const countEl = document.getElementById('dispatch-count');
-        countEl.textContent = `${data.priority_count || 0} PRIORITY INCIDENTS`;
+        countEl.textContent = `${data.priority_count || 0} PRIORITY INCIDENTS (${data.total_incidents || 0} TOTAL)`;
         
-        if (!data.incidents || data.incidents.length === 0) {
+        if ((!data.incidents || data.incidents.length === 0) && (!data.all_incidents || data.all_incidents.length === 0)) {
             document.getElementById('dispatch-tbody').innerHTML = 
-                '<tr><td colspan="4" class="loading">NO PRIORITY INCIDENTS DETECTED</td></tr>';
+                '<tr><td colspan="4" class="loading">NO INCIDENTS DETECTED</td></tr>';
             return;
         }
         
-        // Merge new incidents with history (avoid duplicates)
+        // Merge new priority incidents with history
         data.incidents.forEach(newInc => {
             const exists = allIncidents.some(inc => 
                 inc['Call Time'] === newInc['Call Time'] && 
                 inc['Address'] === newInc['Address']
             );
             if (!exists) {
-                allIncidents.unshift(newInc); // Add to beginning
+                allIncidents.unshift(newInc);
             }
         });
         
+        // Merge ALL incidents with unfiltered history
+        if (data.all_incidents) {
+            data.all_incidents.forEach(newInc => {
+                const exists = allIncidentsUnfiltered.some(inc => 
+                    inc['Call Time'] === newInc['Call Time'] && 
+                    inc['Address'] === newInc['Address']
+                );
+                if (!exists) {
+                    allIncidentsUnfiltered.unshift(newInc);
+                }
+            });
+        }
+        
         // Add incident markers to map
-        addIncidentMarkers(showAllHistory ? allIncidents : data.incidents);
+        const incidentsToMap = showAllIncidents ? 
+            (showAllHistory ? allIncidentsUnfiltered : data.all_incidents) :
+            (showAllHistory ? allIncidents : data.incidents);
+        addIncidentMarkers(incidentsToMap);
         
         // Render table
         renderDispatchTable();
@@ -204,7 +244,10 @@ async function fetchDispatch() {
 // Render dispatch table with sorting
 function renderDispatchTable() {
     const tbody = document.getElementById('dispatch-tbody');
-    const incidents = showAllHistory ? [...allIncidents] : [...allIncidents].slice(0, 50);
+    
+    // Choose which incidents to show
+    let sourceIncidents = showAllIncidents ? allIncidentsUnfiltered : allIncidents;
+    const incidents = showAllHistory ? [...sourceIncidents] : [...sourceIncidents].slice(0, 100);
     
     if (incidents.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="loading">NO INCIDENTS</td></tr>';
@@ -246,7 +289,8 @@ function renderDispatchTable() {
 
 // Highlight incident on map when row is clicked
 function highlightIncident(index) {
-    const incidents = showAllHistory ? allIncidents : allIncidents.slice(0, 50);
+    const sourceIncidents = showAllIncidents ? allIncidentsUnfiltered : allIncidents;
+    const incidents = showAllHistory ? sourceIncidents : sourceIncidents.slice(0, 100);
     const incident = incidents[index];
     
     if (!incident || !incident.has_location) return;
@@ -347,91 +391,4 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-}
-
-// Scanner functions
-function toggleScanner() {
-    const btn = document.getElementById('scanner-toggle');
-    const status = document.getElementById('scanner-status');
-    const container = document.getElementById('scanner-container');
-    const channel = document.getElementById('scanner-channel').value;
-    
-    if (!scannerLoaded) {
-        loadScanner(channel);
-        status.textContent = '⏸ HIDE';
-        btn.classList.add('playing');
-        scannerLoaded = true;
-    } else {
-        container.innerHTML = `
-            <div class="scanner-info">
-                <div class="scanner-notice">
-                    Select a channel and click LOAD to start streaming
-                </div>
-                <div class="scanner-attribution">
-                    Audio from <a href="https://openmhz.com" target="_blank">OpenMHz</a> & <a href="https://www.broadcastify.com" target="_blank">Broadcastify</a>
-                </div>
-            </div>
-        `;
-        status.textContent = '▶ LOAD';
-        btn.classList.remove('playing');
-        scannerLoaded = false;
-    }
-}
-
-function loadScanner(channel) {
-    const container = document.getElementById('scanner-container');
-    
-    if (channel.startsWith('broadcastify-')) {
-        const feedId = channel.replace('broadcastify-', '');
-        container.innerHTML = `
-            <div class="scanner-info">
-                <div class="scanner-notice" style="margin-bottom: 10px;">
-                    Opening Broadcastify feed in new window...
-                </div>
-                <a href="https://www.broadcastify.com/listen/feed/${feedId}" 
-                   target="_blank" 
-                   class="scanner-link" 
-                   style="font-size: 12px; display: block; text-align: center; padding: 15px; border: 1px solid var(--accent-info);">
-                    Click here if window didn't open →
-                </a>
-                <div class="scanner-attribution" style="margin-top: 10px;">
-                    Audio from <a href="https://www.broadcastify.com" target="_blank">Broadcastify.com</a>
-                </div>
-            </div>
-        `;
-        window.open(`https://www.broadcastify.com/listen/feed/${feedId}`, '_blank', 'width=400,height=600');
-    } else if (channel === 'openmhz') {
-        container.innerHTML = `
-            <div class="scanner-info">
-                <iframe 
-                    src="https://openmhz.com/system/houston" 
-                    height="400" 
-                    width="100%" 
-                    frameborder="0"
-                    style="border: none; background: var(--bg-secondary);">
-                </iframe>
-                <div class="scanner-attribution" style="margin-top: 10px;">
-                    Audio from <a href="https://openmhz.com" target="_blank">OpenMHz.com</a>
-                </div>
-            </div>
-        `;
-    } else if (channel === 'radioreference') {
-        container.innerHTML = `
-            <div class="scanner-info">
-                <div class="scanner-notice" style="margin-bottom: 10px;">
-                    Opening RadioReference in new window...
-                </div>
-                <a href="https://www.radioreference.com/db/browse/ctid/2687" 
-                   target="_blank" 
-                   class="scanner-link" 
-                   style="font-size: 12px; display: block; text-align: center; padding: 15px; border: 1px solid var(--accent-info);">
-                    Click here to browse Houston feeds →
-                </a>
-                <div class="scanner-attribution" style="margin-top: 10px;">
-                    Info from <a href="https://www.radioreference.com" target="_blank">RadioReference.com</a>
-                </div>
-            </div>
-        `;
-        window.open('https://www.radioreference.com/db/browse/ctid/2687', '_blank');
-    }
 }

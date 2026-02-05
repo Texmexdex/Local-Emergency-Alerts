@@ -52,23 +52,36 @@
                     <h2 class="panel-title">LIVE SCANNER AUDIO</h2>
                     <div class="scanner-controls">
                         <select id="scanner-channel" class="scanner-select">
-                            <option value="broadcastify-2687">Houston Fire Dispatch (Broadcastify)</option>
-                            <option value="broadcastify-19380">Harris County Fire/EMS (Broadcastify)</option>
-                            <option value="broadcastify-2688">Houston Police Central (Broadcastify)</option>
-                            <option value="openmhz">Houston Trunked Radio (OpenMHz)</option>
-                            <option value="radioreference">RadioReference Archive</option>
+                            <option value="scanner-radio">Scanner Radio App (Recommended)</option>
+                            <option value="5-0-radio">5-0 Radio Police Scanner</option>
+                            <option value="police-scanner">Police Scanner+ App</option>
+                            <option value="broadcastify-web">Broadcastify Web Player</option>
                         </select>
                         <button class="scanner-btn" id="scanner-toggle">
-                            <span id="scanner-status">▶ LOAD</span>
+                            <span id="scanner-status">OPEN APP ↗</span>
                         </button>
                     </div>
                     <div class="scanner-player" id="scanner-container">
                         <div class="scanner-info">
-                            <div class="scanner-notice">
-                                Select a channel and click LOAD to start streaming
+                            <div class="scanner-notice" style="margin-bottom: 15px;">
+                                <strong>Real-time scanner audio requires a mobile app or browser extension.</strong><br><br>
+                                Recommended options for live Houston emergency audio:
                             </div>
-                            <div class="scanner-attribution">
-                                Audio from <a href="https://openmhz.com" target="_blank">OpenMHz</a> & <a href="https://www.broadcastify.com" target="_blank">Broadcastify</a>
+                            <div style="text-align: left; font-size: 11px; line-height: 1.8; color: var(--text-secondary);">
+                                <strong style="color: var(--accent-info);">Mobile Apps (Free):</strong><br>
+                                • Scanner Radio (iOS/Android) - Best for Houston<br>
+                                • 5-0 Radio Police Scanner (iOS/Android)<br>
+                                • Police Scanner+ (iOS/Android)<br><br>
+                                
+                                <strong style="color: var(--accent-info);">Web Options:</strong><br>
+                                • <a href="https://www.broadcastify.com/listen/ctid/2687" target="_blank" style="color: var(--accent-info);">Broadcastify Houston Feeds</a><br>
+                                • <a href="https://www.policescanner.com/" target="_blank" style="color: var(--accent-info);">PoliceScanner.com</a><br><br>
+                                
+                                <strong style="color: var(--accent-info);">Hardware Option:</strong><br>
+                                • SDR Dongle ($25) + SDR# software for direct radio reception
+                            </div>
+                            <div class="scanner-attribution" style="margin-top: 15px;">
+                                Scanner aggregation by <a href="https://www.broadcastify.com" target="_blank">Broadcastify</a>
                             </div>
                         </div>
                     </div>
@@ -115,7 +128,10 @@
                         <button class="sort-btn" id="sort-type" data-sort="type">SORT: TYPE</button>
                         <button class="sort-btn" id="sort-location" data-sort="location">SORT: LOCATION</button>
                         <label style="font-size: 10px; color: var(--text-dim); margin-left: auto;">
-                            <input type="checkbox" id="show-all" style="margin-right: 5px;">SHOW ALL HISTORY
+                            <input type="checkbox" id="show-all-incidents" style="margin-right: 5px;">SHOW ALL (NOT JUST PRIORITY)
+                        </label>
+                        <label style="font-size: 10px; color: var(--text-dim);">
+                            <input type="checkbox" id="show-all" style="margin-right: 5px;">SHOW HISTORY
                         </label>
                     </div>
                     <div class="dispatch-table-container">

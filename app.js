@@ -361,15 +361,11 @@ function toggleScanner() {
         // Start playing
         const channelId = document.getElementById('scanner-channel').value;
         loadScanner(channelId);
-        status.textContent = '⏸ STOP';
+        status.textContent = '⏸ HIDE';
         btn.classList.add('playing');
         isPlaying = true;
     } else {
-        // Stop playing
-        if (scannerAudio) {
-            scannerAudio.pause();
-            scannerAudio = null;
-        }
+        // Hide player
         container.innerHTML = `
             <div class="scanner-info">
                 <div class="scanner-attribution">
@@ -394,40 +390,20 @@ function changeChannel() {
 function loadScanner(channelId) {
     const container = document.getElementById('scanner-container');
     
-    // Stop existing audio
-    if (scannerAudio) {
-        scannerAudio.pause();
-    }
-    
-    // Create audio player
+    // Use Broadcastify's official embed widget (no login required)
     container.innerHTML = `
         <div class="scanner-info">
-            <audio id="scanner-audio" controls autoplay style="width: 100%; margin-bottom: 10px;">
-                <source src="https://broadcastify.cdnstream1.com/${channelId}" type="audio/mpeg">
-                Your browser does not support audio streaming.
-            </audio>
-            <div class="scanner-attribution">
+            <iframe 
+                src="https://www.broadcastify.com/listen/embed/${channelId}" 
+                height="140" 
+                width="100%" 
+                frameborder="0" 
+                allowfullscreen
+                style="border: none; background: var(--bg-secondary);">
+            </iframe>
+            <div class="scanner-attribution" style="margin-top: 10px;">
                 Audio provided by <a href="https://www.broadcastify.com/listen/feed/${channelId}" target="_blank" rel="noopener">Broadcastify.com</a>
             </div>
         </div>
     `;
-    
-    scannerAudio = document.getElementById('scanner-audio');
-    
-    // Handle audio errors
-    scannerAudio.addEventListener('error', () => {
-        container.innerHTML = `
-            <div class="scanner-info">
-                <div class="scanner-notice" style="color: var(--accent-critical);">
-                    Stream unavailable. Channel may be offline.
-                </div>
-                <div class="scanner-attribution">
-                    Try another channel or visit <a href="https://www.broadcastify.com" target="_blank" rel="noopener">Broadcastify.com</a>
-                </div>
-            </div>
-        `;
-        document.getElementById('scanner-status').textContent = '▶ PLAY';
-        document.getElementById('scanner-toggle').classList.remove('playing');
-        isPlaying = false;
-    });
 }

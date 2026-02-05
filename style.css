@@ -216,7 +216,7 @@ body {
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     padding: 15px;
-    min-height: 100px;
+    min-height: 140px;
 }
 
 .scanner-info {

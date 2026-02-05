@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Industrial Safety Monitor</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1>INDUSTRIAL SAFETY MONITOR</h1>
+                <div class="status-bar">
+                    <span class="status-item" id="system-status">SYSTEM: OPERATIONAL</span>
+                    <span class="status-item" id="last-update">LAST UPDATE: --:--:--</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn-refresh" id="refresh-btn">REFRESH DATA</button>
+            </div>
+        </header>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+            <!-- Left Column: Wind & Map -->
+            <div class="left-column">
+                <!-- Wind Conditions -->
+                <section class="panel wind-panel">
+                    <h2 class="panel-title">METEOROLOGICAL CONDITIONS</h2>
+                    <div class="wind-data">
+                        <div class="wind-metric">
+                            <span class="metric-label">WIND DIRECTION</span>
+                            <span class="metric-value" id="wind-direction">---</span>
+                        </div>
+                        <div class="wind-metric">
+                            <span class="metric-label">WIND SPEED</span>
+                            <span class="metric-value" id="wind-speed">-- MPH</span>
+                        </div>
+                        <div class="wind-metric">
+                            <span class="metric-label">TEMPERATURE</span>
+                            <span class="metric-value" id="temperature">-- °F</span>
+                        </div>
+                    </div>
+                    <div class="wind-alert" id="wind-alert"></div>
+                </section>
+
+                <!-- Map -->
+                <section class="panel map-panel">
+                    <h2 class="panel-title">FACILITY LOCATIONS</h2>
+                    <div id="map"></div>
+                </section>
+            </div>
+
+            <!-- Right Column: Alerts & Dispatch -->
+            <div class="right-column">
+                <!-- CAER Alerts -->
+                <section class="panel caer-panel">
+                    <h2 class="panel-title">COMMUNITY ALERT SYSTEM (CAER)</h2>
+                    <div class="caer-count">
+                        <span id="caer-count">0 ACTIVE MESSAGES</span>
+                    </div>
+                    <div class="caer-messages" id="caer-messages">
+                        <div class="loading">LOADING CAER DATA...</div>
+                    </div>
+                </section>
+
+                <!-- Emergency Dispatch -->
+                <section class="panel dispatch-panel">
+                    <h2 class="panel-title">EMERGENCY DISPATCH LOG</h2>
+                    <div class="dispatch-count">
+                        <span id="dispatch-count">0 PRIORITY INCIDENTS</span>
+                    </div>
+                    <div class="dispatch-table-container">
+                        <table class="dispatch-table" id="dispatch-table">
+                            <thead>
+                                <tr>
+                                    <th>TIME</th>
+                                    <th>AGENCY</th>
+                                    <th>TYPE</th>
+                                    <th>LOCATION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dispatch-tbody">
+                                <tr>
+                                    <td colspan="4" class="loading">LOADING DISPATCH DATA...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

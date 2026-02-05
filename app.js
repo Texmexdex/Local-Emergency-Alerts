@@ -4,6 +4,7 @@ const REFRESH_INTERVAL = 30000; // 30 seconds
 
 let map;
 let markers = {};
+let incidentMarkers = [];
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -144,6 +145,9 @@ async function fetchDispatch() {
             return;
         }
         
+        // Add incident markers to map
+        addIncidentMarkers(data.incidents);
+        
         tbody.innerHTML = data.incidents.map(inc => {
             const time = inc['Call Time'] || inc['Time'] || '--';
             const agency = inc['Agency'] || '--';
@@ -178,13 +182,14 @@ async function fetchFacilities() {
             const icon = L.divIcon({
                 className: 'custom-marker',
                 html: `<div style="
-                    background: ${data.type === 'residence' ? '#33cc66' : '#ff3333'};
-                    width: 8px;
-                    height: 8px;
-                    border: 1px solid #fff;
+                    background: #ff3333;
+                    width: 10px;
+                    height: 10px;
+                    border: 2px solid #fff;
                     border-radius: 50%;
+                    box-shadow: 0 0 4px rgba(255,51,51,0.8);
                 "></div>`,
-                iconSize: [8, 8]
+                iconSize: [10, 10]
             });
             
             const marker = L.marker([data.lat, data.lon], { icon })
@@ -197,6 +202,46 @@ async function fetchFacilities() {
     } catch (error) {
         console.error('Facilities fetch error:', error);
     }
+}
+
+// Add incident markers to map
+function addIncidentMarkers(incidents) {
+    // Clear old incident markers
+    incidentMarkers.forEach(marker => map.removeLayer(marker));
+    incidentMarkers = [];
+    
+    incidents.forEach(inc => {
+        if (inc.has_location && inc.lat && inc.lon) {
+            const icon = L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="
+                    background: #ff9933;
+                    width: 12px;
+                    height: 12px;
+                    border: 2px solid #fff;
+                    border-radius: 50%;
+                    box-shadow: 0 0 6px rgba(255,153,51,0.9);
+                    animation: pulse 2s infinite;
+                "></div>`,
+                iconSize: [12, 12]
+            });
+            
+            const time = inc['Call Time'] || inc['Time'] || 'Unknown';
+            const type = inc['Incident Type'] || inc['Type'] || 'Unknown';
+            const location = inc['Address'] || inc['Location'] || 'Unknown';
+            
+            const marker = L.marker([inc.lat, inc.lon], { icon })
+                .addTo(map)
+                .bindPopup(`
+                    <strong>ACTIVE INCIDENT</strong><br>
+                    <strong>Time:</strong> ${escapeHtml(time)}<br>
+                    <strong>Type:</strong> ${escapeHtml(type)}<br>
+                    <strong>Location:</strong> ${escapeHtml(location)}
+                `);
+            
+            incidentMarkers.push(marker);
+        }
+    });
 }
 
 // Utility: Escape HTML

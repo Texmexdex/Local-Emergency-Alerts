@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
+
 <body>
     <div class="container">
         <!-- Header -->
@@ -25,7 +27,7 @@
 
         <!-- Main Grid -->
         <div class="main-grid">
-            <!-- Left Column: Wind & Map -->
+            <!-- Left Column: Wind, Radio, Weather & TCEQ -->
             <div class="left-column">
                 <!-- Wind Conditions -->
                 <section class="panel wind-panel">
@@ -45,9 +47,61 @@
                         </div>
                     </div>
                     <div class="wind-alert" id="wind-alert"></div>
+                    <div class="plume-controls">
+                        <label class="plume-toggle">
+                            <input type="checkbox" id="show-plumes">
+                            SHOW DISPERSION PLUMES (BETA)
+                        </label>
+                    </div>
                 </section>
 
-                <!-- Map -->
+                <!-- Radio Scanner -->
+                <section class="panel radio-panel">
+                    <h2 class="panel-title">📻 RADIO SCANNER</h2>
+                    <div class="radio-controls">
+                        <select id="radio-channel" class="radio-select">
+                            <option value="">-- SELECT CHANNEL --</option>
+                        </select>
+                        <label class="auto-switch-label">
+                            <input type="checkbox" id="auto-switch" checked>
+                            AUTO-LINK
+                        </label>
+                    </div>
+                    <div class="radio-info">
+                        <span id="radio-status">No channel selected</span>
+                    </div>
+                    <div class="radio-player" id="radio-player">
+                        <div class="radio-placeholder">
+                            Select a channel or click an incident to listen
+                        </div>
+                    </div>
+                </section>
+
+                <!-- NWS Weather Alerts -->
+                <section class="panel weather-panel">
+                    <h2 class="panel-title">⚡ NWS WEATHER ALERTS</h2>
+                    <div class="alert-count">
+                        <span id="weather-count">0 ACTIVE ALERTS</span>
+                    </div>
+                    <div class="weather-alerts" id="weather-alerts">
+                        <div class="loading">LOADING WEATHER ALERTS...</div>
+                    </div>
+                </section>
+
+                <!-- TCEQ Emissions -->
+                <section class="panel tceq-panel">
+                    <h2 class="panel-title">🏭 TCEQ EMISSION EVENTS</h2>
+                    <div class="alert-count">
+                        <span id="tceq-count">0 EVENTS</span>
+                    </div>
+                    <div class="tceq-events" id="tceq-events">
+                        <div class="loading">LOADING TCEQ DATA...</div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Center Column: Map -->
+            <div class="center-column">
                 <section class="panel map-panel">
                     <h2 class="panel-title">FACILITY LOCATIONS</h2>
                     <div class="map-legend">
@@ -60,7 +114,21 @@
                             <span>ACTIVE INCIDENT</span>
                         </div>
                     </div>
-                    <div id="map"></div>
+                    <div id="map">
+                        <!-- Wind Direction Overlay -->
+                        <div class="wind-overlay" id="wind-overlay">
+                            <span class="wind-overlay-title">WIND</span>
+                            <div class="wind-arrow-container">
+                                <div class="wind-arrow" id="wind-arrow">
+                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M12 2L4 14h6v8l8-12h-6z" />
+                                    </svg>
+                                </div>
+                            </div>
+                            <span class="wind-speed-label" id="wind-speed-overlay">-- MPH</span>
+                            <span class="wind-direction-label" id="wind-dir-overlay">---</span>
+                        </div>
+                    </div>
                 </section>
             </div>
 
@@ -80,18 +148,19 @@
                 <!-- Emergency Dispatch -->
                 <section class="panel dispatch-panel">
                     <h2 class="panel-title">EMERGENCY DISPATCH LOG</h2>
-                    <div class="dispatch-count">
+                    <div class="dispatch-header">
                         <span id="dispatch-count">0 PRIORITY INCIDENTS</span>
+                        <span class="click-hint">Click row to tune radio</span>
                     </div>
                     <div class="sort-controls">
-                        <button class="sort-btn active" id="sort-time" data-sort="time">SORT: TIME</button>
-                        <button class="sort-btn" id="sort-type" data-sort="type">SORT: TYPE</button>
-                        <button class="sort-btn" id="sort-location" data-sort="location">SORT: LOCATION</button>
+                        <button class="sort-btn active" id="sort-time" data-sort="time">TIME</button>
+                        <button class="sort-btn" id="sort-type" data-sort="type">TYPE</button>
+                        <button class="sort-btn" id="sort-location" data-sort="location">LOCATION</button>
                         <label style="font-size: 10px; color: var(--text-dim); margin-left: auto;">
-                            <input type="checkbox" id="show-all-incidents" style="margin-right: 5px;">SHOW ALL (NOT JUST PRIORITY)
+                            <input type="checkbox" id="show-all-incidents" style="margin-right: 5px;">ALL
                         </label>
                         <label style="font-size: 10px; color: var(--text-dim);">
-                            <input type="checkbox" id="show-all" style="margin-right: 5px;">SHOW HISTORY
+                            <input type="checkbox" id="show-all" style="margin-right: 5px;">HISTORY
                         </label>
                     </div>
                     <div class="dispatch-table-container">
@@ -123,4 +192,5 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>

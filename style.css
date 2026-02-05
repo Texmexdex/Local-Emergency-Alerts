@@ -78,12 +78,13 @@ body {
     border-color: var(--text-secondary);
 }
 
-/* Main Grid */
+/* Main Grid - 3 Column Layout */
 .main-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 0.9fr 1.2fr 1fr;
     gap: 0;
     min-height: calc(100vh - 150px);
+    align-items: start;
 }
 
 .left-column,
@@ -91,6 +92,13 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0;
+}
+
+.center-column {
+    position: sticky;
+    top: 20px;
+    align-self: start;
+    height: fit-content;
 }
 
 /* Panels */
@@ -159,6 +167,30 @@ body {
     background: rgba(51, 204, 102, 0.1);
     border-color: var(--accent-success);
     color: var(--accent-success);
+}
+
+.plume-controls {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+}
+
+.plume-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    cursor: pointer;
+}
+
+.plume-toggle:hover {
+    color: var(--text-primary);
+}
+
+.plume-toggle input {
+    cursor: pointer;
 }
 
 /* Scanner Panel */
@@ -267,8 +299,9 @@ body {
 
 /* Map Panel */
 .map-panel {
-    flex: 1;
+    height: 100%;
     border-left: none;
+    border-right: none;
     display: flex;
     flex-direction: column;
 }
@@ -307,9 +340,74 @@ body {
 }
 
 #map {
-    flex: 1;
+    height: 500px;
+    min-height: 500px;
+    max-height: 500px;
     background: var(--bg-secondary);
-    min-height: 400px;
+    position: relative;
+}
+
+/* Wind Direction Overlay */
+.wind-overlay {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    background: rgba(10, 10, 10, 0.85);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    min-width: 80px;
+}
+
+.wind-overlay-title {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.wind-arrow-container {
+    width: 60px;
+    height: 60px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wind-arrow {
+    width: 50px;
+    height: 50px;
+    transition: transform 0.5s ease;
+}
+
+.wind-arrow svg {
+    width: 100%;
+    height: 100%;
+    fill: var(--accent-info);
+    filter: drop-shadow(0 0 4px rgba(51, 153, 255, 0.5));
+}
+
+.wind-arrow.risk svg {
+    fill: var(--accent-warning);
+    filter: drop-shadow(0 0 4px rgba(255, 153, 51, 0.5));
+}
+
+.wind-speed-label {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
+}
+
+.wind-direction-label {
+    font-size: 10px;
+    color: var(--text-secondary);
 }
 
 /* CAER Panel */
@@ -492,40 +590,6 @@ body {
     background: var(--text-dim);
 }
 
-/* Responsive */
-@media (max-width: 1200px) {
-    .main-grid {
-        grid-template-columns: 1fr;
-        height: auto;
-    }
-    
-    .wind-data {
-        grid-template-columns: repeat(3, 1fr);
-    }
-    
-    .caer-panel,
-    .dispatch-panel {
-        max-height: 60vh;
-    }
-}
-
-@media (max-width: 768px) {
-    .header {
-        flex-direction: column;
-        gap: 15px;
-        align-items: flex-start;
-    }
-    
-    .wind-data {
-        grid-template-columns: 1fr;
-    }
-    
-    .status-bar {
-        flex-direction: column;
-        gap: 5px;
-    }
-}
-
 /* Footer */
 .footer {
     background: var(--bg-secondary);
@@ -539,12 +603,286 @@ body {
 
 /* Map marker pulse animation */
 @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         opacity: 1;
         transform: scale(1);
     }
+
     50% {
         opacity: 0.6;
         transform: scale(1.2);
+    }
+}
+
+/* ============================================
+   RADIO SCANNER PANEL
+   ============================================ */
+.radio-panel {
+    border-left: none;
+}
+
+.radio-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.radio-select {
+    flex: 1;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+}
+
+.radio-select:focus {
+    outline: none;
+    border-color: var(--accent-info);
+}
+
+.auto-switch-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.auto-switch-label input {
+    cursor: pointer;
+}
+
+.radio-info {
+    font-size: 10px;
+    color: var(--accent-info);
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+}
+
+.radio-player {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+}
+
+.radio-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100px;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 15px;
+}
+
+.radio-external-link {
+    display: block;
+    text-align: center;
+    padding: 8px;
+    font-size: 10px;
+    color: var(--accent-info);
+    text-decoration: none;
+    border-top: 1px solid var(--border-color);
+    letter-spacing: 0.5px;
+}
+
+.radio-external-link:hover {
+    background: rgba(51, 153, 255, 0.1);
+    text-decoration: underline;
+}
+
+/* ============================================
+   WEATHER ALERTS PANEL
+   ============================================ */
+.weather-panel {
+    border-left: none;
+    border-right: none;
+}
+
+.weather-alerts {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.weather-alert {
+    border: 1px solid var(--border-color);
+    padding: 12px;
+    background: var(--bg-secondary);
+}
+
+.weather-alert.critical {
+    border-left: 3px solid var(--accent-critical);
+    background: rgba(255, 51, 51, 0.1);
+}
+
+.weather-alert.warning {
+    border-left: 3px solid var(--accent-warning);
+    background: rgba(255, 153, 51, 0.1);
+}
+
+.weather-alert.info {
+    border-left: 3px solid var(--accent-info);
+}
+
+.alert-event {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+}
+
+.alert-headline {
+    font-size: 10px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.alert-count {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+}
+
+.no-alerts {
+    font-size: 11px;
+    color: var(--accent-success);
+    padding: 15px;
+    text-align: center;
+    background: rgba(51, 204, 102, 0.1);
+    border: 1px solid var(--accent-success);
+}
+
+/* ============================================
+   TCEQ EMISSIONS PANEL
+   ============================================ */
+.tceq-panel {
+    flex: 1;
+    border-left: none;
+    border-right: none;
+}
+
+.tceq-events {
+    max-height: 300px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tceq-event {
+    border: 1px solid var(--border-color);
+    padding: 12px;
+    background: var(--bg-secondary);
+}
+
+.tceq-event.critical {
+    border-left: 3px solid var(--accent-critical);
+}
+
+.tceq-event.warning {
+    border-left: 3px solid var(--accent-warning);
+}
+
+.event-facility {
+    font-size: 11px;
+    color: var(--text-primary);
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+}
+
+.event-details {
+    font-size: 10px;
+    color: var(--text-dim);
+}
+
+/* ============================================
+   DISPATCH HEADER
+   ============================================ */
+.dispatch-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+}
+
+.click-hint {
+    font-size: 9px;
+    color: var(--accent-info);
+    font-style: italic;
+}
+
+/* ============================================
+   RESPONSIVE UPDATES
+   ============================================ */
+@media (max-width: 1400px) {
+    .main-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .center-column {
+        display: none;
+    }
+}
+
+@media (max-width: 1200px) {
+    .main-grid {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+
+    .center-column {
+        display: flex;
+    }
+
+    .wind-data {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .caer-panel,
+    .dispatch-panel {
+        max-height: 60vh;
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+
+    .wind-data {
+        grid-template-columns: 1fr;
+    }
+
+    .status-bar {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .radio-controls {
+        flex-direction: column;
     }
 }

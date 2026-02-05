@@ -271,28 +271,6 @@ function highlightIncident(index) {
         marker.openPopup();
     }
 }
-            const time = inc['Call Time'] || inc['Time'] || inc['Call DateTime'] || inc['Incident Time'] || '--';
-            const agency = inc['Agency'] || inc['Department'] || '--';
-            const type = inc['Incident Type'] || inc['Type'] || inc['Problem'] || '--';
-            const location = inc['Address'] || inc['Location'] || inc['Block'] || '--';
-            
-            return `
-                <tr>
-                    <td>${escapeHtml(String(time))}</td>
-                    <td>${escapeHtml(String(agency))}</td>
-                    <td>${escapeHtml(String(type))}</td>
-                    <td>${escapeHtml(String(location))}</td>
-                </tr>
-            `;
-        }).join('');
-        
-    } catch (error) {
-        console.error('Dispatch fetch error:', error);
-        document.getElementById('dispatch-tbody').innerHTML = 
-            `<tr><td colspan="4" class="error">DISPATCH FEED UNAVAILABLE: ${error.message}</td></tr>`;
-        document.getElementById('dispatch-count').textContent = '0 PRIORITY INCIDENTS';
-    }
-}
 
 // Fetch Facilities and add to map
 async function fetchFacilities() {

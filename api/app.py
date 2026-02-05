@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from datetime import datetime
+import zlib
 
 app = Flask(__name__)
 CORS(app)
@@ -164,10 +165,30 @@ def get_dispatch():
             if address and len(address) > 2 and address != 'nan':
                 cleaned['has_location'] = True
                 try:
-                    grid_num = int(''.join(filter(str.isdigit, key_map))) if key_map else 500
-                    # Houston grid system
-                    cleaned['lat'] = 29.5 + (grid_num % 100) * 0.01
-                    cleaned['lon'] = -95.6 + (grid_num // 100) * 0.1
+                    # Use deterministic hash of address for organic distribution
+                    # This avoids the "vertical lines" artifact of the previous Key Map math
+                    # while ensuring the same address always maps to the same spot.
+                    
+                    # Create a seed from the address string
+                    addr_bytes = (address + cleaned.get('Key Map', '')).encode('utf-8')
+                    seed = zlib.crc32(addr_bytes)
+                    
+                    # Generate pseudo-random float 0-1 from seed
+                    # Separate seeds for lat and lon to avoid diagonal correlation
+                    lat_seed = seed
+                    lon_seed = zlib.crc32(addr_bytes + b'lon')
+                    
+                    lat_norm = (lat_seed % 1000) / 1000.0
+                    lon_norm = (lon_seed % 1000) / 1000.0
+                    
+                    # Map to Houston bounding box
+                    # Lat: ~29.55 (South Belt) to ~29.95 (Bush Airport/Humble)
+                    # Lon: ~-95.6 (West Belt) to ~-95.1 (Channelview/Baytown)
+                    cleaned['lat'] = 29.55 + (lat_norm * 0.40)
+                    cleaned['lon'] = -95.60 + (lon_norm * 0.50)
+                    
+                    # If Key Map is available, we could use it for coarser sectoring, 
+                    # but Hash is safer to avoid grid artifacts.
                 except:
                     cleaned['lat'] = 29.76
                     cleaned['lon'] = -95.36

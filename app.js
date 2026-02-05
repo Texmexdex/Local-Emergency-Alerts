@@ -9,8 +9,6 @@ let incidentMarkers = [];
 let allIncidents = []; // Store all incidents for history
 let currentSort = 'time';
 let showAllHistory = false;
-let scannerAudio = null;
-let isPlaying = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -41,9 +39,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDispatchTable();
     });
     
-    // Scanner controls
-    document.getElementById('scanner-toggle').addEventListener('click', toggleScanner);
-    document.getElementById('scanner-channel').addEventListener('change', changeChannel);
+    // Scanner open button
+    document.getElementById('scanner-open').addEventListener('click', () => {
+        const channelId = document.getElementById('scanner-channel').value;
+        window.open(`https://www.broadcastify.com/listen/feed/${channelId}`, '_blank');
+    });
 });
 
 // Initialize Leaflet Map
@@ -349,61 +349,4 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-}
-
-// Scanner functions
-function toggleScanner() {
-    const btn = document.getElementById('scanner-toggle');
-    const status = document.getElementById('scanner-status');
-    const container = document.getElementById('scanner-container');
-    
-    if (!isPlaying) {
-        // Start playing
-        const channelId = document.getElementById('scanner-channel').value;
-        loadScanner(channelId);
-        status.textContent = '⏸ HIDE';
-        btn.classList.add('playing');
-        isPlaying = true;
-    } else {
-        // Hide player
-        container.innerHTML = `
-            <div class="scanner-info">
-                <div class="scanner-attribution">
-                    Audio provided by <a href="https://www.broadcastify.com" target="_blank" rel="noopener">Broadcastify.com</a>
-                </div>
-                <div class="scanner-notice">Click PLAY to start live audio stream</div>
-            </div>
-        `;
-        status.textContent = '▶ PLAY';
-        btn.classList.remove('playing');
-        isPlaying = false;
-    }
-}
-
-function changeChannel() {
-    if (isPlaying) {
-        const channelId = document.getElementById('scanner-channel').value;
-        loadScanner(channelId);
-    }
-}
-
-function loadScanner(channelId) {
-    const container = document.getElementById('scanner-container');
-    
-    // Use Broadcastify's widget embed format
-    container.innerHTML = `
-        <div class="scanner-info">
-            <iframe 
-                src="https://www.broadcastify.com/widget/?feedId=${channelId}" 
-                height="140" 
-                width="100%" 
-                frameborder="0" 
-                allowfullscreen
-                style="border: none; background: var(--bg-secondary);">
-            </iframe>
-            <div class="scanner-attribution" style="margin-top: 10px;">
-                Audio provided by <a href="https://www.broadcastify.com/listen/feed/${channelId}" target="_blank" rel="noopener">Broadcastify.com</a>
-            </div>
-        </div>
-    `;
 }

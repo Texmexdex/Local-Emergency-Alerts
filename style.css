@@ -247,6 +247,22 @@ body {
     font-size: 10px;
     color: var(--text-secondary);
     letter-spacing: 0.5px;
+    text-align: center;
+}
+
+.scanner-links {
+    margin-top: 10px;
+}
+
+.scanner-link {
+    color: var(--accent-info);
+    text-decoration: none;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+}
+
+.scanner-link:hover {
+    text-decoration: underline;
 }
 
 /* Map Panel */

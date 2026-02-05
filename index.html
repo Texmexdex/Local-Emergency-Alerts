@@ -52,30 +52,23 @@
                     <h2 class="panel-title">LIVE SCANNER AUDIO</h2>
                     <div class="scanner-controls">
                         <select id="scanner-channel" class="scanner-select">
-                            <option value="2687">Houston Fire Dispatch</option>
-                            <option value="19380">Harris County Fire/EMS</option>
-                            <option value="2688">Houston Police - Central</option>
-                            <option value="2689">Houston Police - South</option>
-                            <option value="2690">Houston Police - North</option>
-                            <option value="19379">Pasadena Fire/Police</option>
-                            <option value="19381">Baytown Fire/EMS</option>
+                            <option value="broadcastify-2687">Houston Fire Dispatch (Broadcastify)</option>
+                            <option value="broadcastify-19380">Harris County Fire/EMS (Broadcastify)</option>
+                            <option value="broadcastify-2688">Houston Police Central (Broadcastify)</option>
+                            <option value="openmhz">Houston Trunked Radio (OpenMHz)</option>
+                            <option value="radioreference">RadioReference Archive</option>
                         </select>
-                        <button class="scanner-btn" id="scanner-open">
-                            <span>OPEN FEED ↗</span>
+                        <button class="scanner-btn" id="scanner-toggle">
+                            <span id="scanner-status">▶ LOAD</span>
                         </button>
                     </div>
-                    <div class="scanner-player">
+                    <div class="scanner-player" id="scanner-container">
                         <div class="scanner-info">
                             <div class="scanner-notice">
-                                Select a channel and click "OPEN FEED" to listen on Broadcastify.com
+                                Select a channel and click LOAD to start streaming
                             </div>
                             <div class="scanner-attribution">
-                                Audio provided by <a href="https://www.broadcastify.com" target="_blank" rel="noopener">Broadcastify.com</a>
-                            </div>
-                            <div class="scanner-links">
-                                <a href="https://www.broadcastify.com/listen/ctid/2687" target="_blank" rel="noopener" class="scanner-link">
-                                    Browse All Houston Feeds →
-                                </a>
+                                Audio from <a href="https://openmhz.com" target="_blank">OpenMHz</a> & <a href="https://www.broadcastify.com" target="_blank">Broadcastify</a>
                             </div>
                         </div>
                     </div>

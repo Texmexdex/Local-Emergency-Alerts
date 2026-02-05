@@ -9,6 +9,7 @@ let incidentMarkers = [];
 let allIncidents = []; // Store all incidents for history
 let currentSort = 'time';
 let showAllHistory = false;
+let scannerLoaded = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -39,11 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDispatchTable();
     });
     
-    // Scanner open button
-    document.getElementById('scanner-open').addEventListener('click', () => {
-        const channelId = document.getElementById('scanner-channel').value;
-        window.open(`https://www.broadcastify.com/listen/feed/${channelId}`, '_blank');
-    });
+    // Scanner toggle
+    document.getElementById('scanner-toggle').addEventListener('click', toggleScanner);
 });
 
 // Initialize Leaflet Map
@@ -349,4 +347,91 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Scanner functions
+function toggleScanner() {
+    const btn = document.getElementById('scanner-toggle');
+    const status = document.getElementById('scanner-status');
+    const container = document.getElementById('scanner-container');
+    const channel = document.getElementById('scanner-channel').value;
+    
+    if (!scannerLoaded) {
+        loadScanner(channel);
+        status.textContent = '⏸ HIDE';
+        btn.classList.add('playing');
+        scannerLoaded = true;
+    } else {
+        container.innerHTML = `
+            <div class="scanner-info">
+                <div class="scanner-notice">
+                    Select a channel and click LOAD to start streaming
+                </div>
+                <div class="scanner-attribution">
+                    Audio from <a href="https://openmhz.com" target="_blank">OpenMHz</a> & <a href="https://www.broadcastify.com" target="_blank">Broadcastify</a>
+                </div>
+            </div>
+        `;
+        status.textContent = '▶ LOAD';
+        btn.classList.remove('playing');
+        scannerLoaded = false;
+    }
+}
+
+function loadScanner(channel) {
+    const container = document.getElementById('scanner-container');
+    
+    if (channel.startsWith('broadcastify-')) {
+        const feedId = channel.replace('broadcastify-', '');
+        container.innerHTML = `
+            <div class="scanner-info">
+                <div class="scanner-notice" style="margin-bottom: 10px;">
+                    Opening Broadcastify feed in new window...
+                </div>
+                <a href="https://www.broadcastify.com/listen/feed/${feedId}" 
+                   target="_blank" 
+                   class="scanner-link" 
+                   style="font-size: 12px; display: block; text-align: center; padding: 15px; border: 1px solid var(--accent-info);">
+                    Click here if window didn't open →
+                </a>
+                <div class="scanner-attribution" style="margin-top: 10px;">
+                    Audio from <a href="https://www.broadcastify.com" target="_blank">Broadcastify.com</a>
+                </div>
+            </div>
+        `;
+        window.open(`https://www.broadcastify.com/listen/feed/${feedId}`, '_blank', 'width=400,height=600');
+    } else if (channel === 'openmhz') {
+        container.innerHTML = `
+            <div class="scanner-info">
+                <iframe 
+                    src="https://openmhz.com/system/houston" 
+                    height="400" 
+                    width="100%" 
+                    frameborder="0"
+                    style="border: none; background: var(--bg-secondary);">
+                </iframe>
+                <div class="scanner-attribution" style="margin-top: 10px;">
+                    Audio from <a href="https://openmhz.com" target="_blank">OpenMHz.com</a>
+                </div>
+            </div>
+        `;
+    } else if (channel === 'radioreference') {
+        container.innerHTML = `
+            <div class="scanner-info">
+                <div class="scanner-notice" style="margin-bottom: 10px;">
+                    Opening RadioReference in new window...
+                </div>
+                <a href="https://www.radioreference.com/db/browse/ctid/2687" 
+                   target="_blank" 
+                   class="scanner-link" 
+                   style="font-size: 12px; display: block; text-align: center; padding: 15px; border: 1px solid var(--accent-info);">
+                    Click here to browse Houston feeds →
+                </a>
+                <div class="scanner-attribution" style="margin-top: 10px;">
+                    Info from <a href="https://www.radioreference.com" target="_blank">RadioReference.com</a>
+                </div>
+            </div>
+        `;
+        window.open('https://www.radioreference.com/db/browse/ctid/2687', '_blank');
+    }
 }

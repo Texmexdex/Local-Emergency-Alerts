@@ -340,9 +340,8 @@ body {
 }
 
 #map {
-    height: 500px;
+    height: calc(100vh - 180px);
     min-height: 500px;
-    max-height: 500px;
     background: var(--bg-secondary);
     position: relative;
 }

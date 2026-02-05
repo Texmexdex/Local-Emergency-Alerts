@@ -6,6 +6,9 @@ const USE_MOCK_DATA = false; // Set to true for testing without backend
 let map;
 let markers = {};
 let incidentMarkers = [];
+let allIncidents = []; // Store all incidents for history
+let currentSort = 'time';
+let showAllHistory = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,6 +21,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // Manual refresh button
     document.getElementById('refresh-btn').addEventListener('click', () => {
         fetchAllData();
+    });
+    
+    // Sort controls
+    document.querySelectorAll('.sort-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            currentSort = e.target.dataset.sort;
+            renderDispatchTable();
+        });
+    });
+    
+    // Show all history toggle
+    document.getElementById('show-all').addEventListener('change', (e) => {
+        showAllHistory = e.target.checked;
+        renderDispatchTable();
     });
 });
 
@@ -144,21 +163,108 @@ async function fetchDispatch() {
             throw new Error(data.error);
         }
         
-        const tbody = document.getElementById('dispatch-tbody');
         const countEl = document.getElementById('dispatch-count');
-        
         countEl.textContent = `${data.priority_count || 0} PRIORITY INCIDENTS`;
         
         if (!data.incidents || data.incidents.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="loading">NO PRIORITY INCIDENTS DETECTED</td></tr>';
+            document.getElementById('dispatch-tbody').innerHTML = 
+                '<tr><td colspan="4" class="loading">NO PRIORITY INCIDENTS DETECTED</td></tr>';
             return;
         }
         
-        // Add incident markers to map
-        addIncidentMarkers(data.incidents);
+        // Merge new incidents with history (avoid duplicates)
+        data.incidents.forEach(newInc => {
+            const exists = allIncidents.some(inc => 
+                inc['Call Time'] === newInc['Call Time'] && 
+                inc['Address'] === newInc['Address']
+            );
+            if (!exists) {
+                allIncidents.unshift(newInc); // Add to beginning
+            }
+        });
         
-        tbody.innerHTML = data.incidents.map(inc => {
-            // Try multiple possible column names
+        // Add incident markers to map
+        addIncidentMarkers(showAllHistory ? allIncidents : data.incidents);
+        
+        // Render table
+        renderDispatchTable();
+        
+    } catch (error) {
+        console.error('Dispatch fetch error:', error);
+        document.getElementById('dispatch-tbody').innerHTML = 
+            `<tr><td colspan="4" class="error">DISPATCH FEED UNAVAILABLE: ${error.message}</td></tr>`;
+        document.getElementById('dispatch-count').textContent = '0 PRIORITY INCIDENTS';
+    }
+}
+
+// Render dispatch table with sorting
+function renderDispatchTable() {
+    const tbody = document.getElementById('dispatch-tbody');
+    const incidents = showAllHistory ? [...allIncidents] : [...allIncidents].slice(0, 50);
+    
+    if (incidents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="loading">NO INCIDENTS</td></tr>';
+        return;
+    }
+    
+    // Sort incidents
+    incidents.sort((a, b) => {
+        if (currentSort === 'time') {
+            return (b['Call Time'] || '').localeCompare(a['Call Time'] || '');
+        } else if (currentSort === 'type') {
+            return (a['Incident Type'] || '').localeCompare(b['Incident Type'] || '');
+        } else if (currentSort === 'location') {
+            return (a['Address'] || '').localeCompare(b['Address'] || '');
+        }
+        return 0;
+    });
+    
+    tbody.innerHTML = incidents.map((inc, idx) => {
+        const time = inc['Call Time'] || inc['Time'] || inc['Call DateTime'] || inc['Incident Time'] || '--';
+        const agency = inc['Agency'] || inc['Department'] || '--';
+        const type = inc['Incident Type'] || inc['Type'] || inc['Problem'] || '--';
+        const location = inc['Address'] || inc['Location'] || inc['Block'] || '--';
+        
+        // Check if industrial incident
+        const isIndustrial = /FIRE|EXPLOSION|CHEMICAL|HAZMAT|INDUSTRIAL|REFINERY|PLANT/i.test(type);
+        const rowClass = isIndustrial ? 'industrial-incident' : '';
+        
+        return `
+            <tr class="${rowClass}" data-incident-index="${idx}" onclick="highlightIncident(${idx})">
+                <td>${escapeHtml(String(time))}</td>
+                <td>${escapeHtml(String(agency))}</td>
+                <td>${escapeHtml(String(type))}</td>
+                <td>${escapeHtml(String(location))}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Highlight incident on map when row is clicked
+function highlightIncident(index) {
+    const incidents = showAllHistory ? allIncidents : allIncidents.slice(0, 50);
+    const incident = incidents[index];
+    
+    if (!incident || !incident.has_location) return;
+    
+    // Remove previous selection
+    document.querySelectorAll('.dispatch-table tbody tr').forEach(tr => tr.classList.remove('selected'));
+    
+    // Highlight selected row
+    document.querySelector(`tr[data-incident-index="${index}"]`)?.classList.add('selected');
+    
+    // Pan map to incident location
+    map.setView([incident.lat, incident.lon], 14);
+    
+    // Flash the marker
+    const marker = incidentMarkers.find(m => 
+        m.getLatLng().lat === incident.lat && m.getLatLng().lng === incident.lon
+    );
+    
+    if (marker) {
+        marker.openPopup();
+    }
+}
             const time = inc['Call Time'] || inc['Time'] || inc['Call DateTime'] || inc['Incident Time'] || '--';
             const agency = inc['Agency'] || inc['Department'] || '--';
             const type = inc['Incident Type'] || inc['Type'] || inc['Problem'] || '--';

@@ -83,7 +83,7 @@ body {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0;
-    height: calc(100vh - 100px);
+    min-height: calc(100vh - 150px);
 }
 
 .left-column,
@@ -309,6 +309,48 @@ body {
 
 .dispatch-table tbody tr:hover {
     background: var(--bg-secondary);
+    cursor: pointer;
+}
+
+.dispatch-table tbody tr.industrial-incident {
+    background: rgba(255, 51, 51, 0.15);
+    border-left: 3px solid var(--accent-critical);
+}
+
+.dispatch-table tbody tr.selected {
+    background: rgba(51, 153, 255, 0.2);
+    border-left: 3px solid var(--accent-info);
+}
+
+/* Sort Controls */
+.sort-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+    align-items: center;
+}
+
+.sort-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.sort-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--text-secondary);
+}
+
+.sort-btn.active {
+    background: var(--bg-secondary);
+    border-color: var(--accent-info);
+    color: var(--accent-info);
 }
 
 /* Loading & Error States */

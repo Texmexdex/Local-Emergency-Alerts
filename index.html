@@ -83,6 +83,14 @@
                     <div class="dispatch-count">
                         <span id="dispatch-count">0 PRIORITY INCIDENTS</span>
                     </div>
+                    <div class="sort-controls">
+                        <button class="sort-btn active" id="sort-time" data-sort="time">SORT: TIME</button>
+                        <button class="sort-btn" id="sort-type" data-sort="type">SORT: TYPE</button>
+                        <button class="sort-btn" id="sort-location" data-sort="location">SORT: LOCATION</button>
+                        <label style="font-size: 10px; color: var(--text-dim); margin-left: auto;">
+                            <input type="checkbox" id="show-all" style="margin-right: 5px;">SHOW ALL HISTORY
+                        </label>
+                    </div>
                     <div class="dispatch-table-container">
                         <table class="dispatch-table" id="dispatch-table">
                             <thead>

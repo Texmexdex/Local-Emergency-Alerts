@@ -380,6 +380,17 @@ body {
     }
 }
 
+/* Footer */
+.footer {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    padding: 15px 30px;
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+}
+
 /* Map marker pulse animation */
 @keyframes pulse {
     0%, 100% {

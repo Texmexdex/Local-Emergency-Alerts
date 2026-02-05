@@ -9,6 +9,8 @@ let incidentMarkers = [];
 let allIncidents = []; // Store all incidents for history
 let currentSort = 'time';
 let showAllHistory = false;
+let scannerAudio = null;
+let isPlaying = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -38,6 +40,10 @@ document.addEventListener('DOMContentLoaded', () => {
         showAllHistory = e.target.checked;
         renderDispatchTable();
     });
+    
+    // Scanner controls
+    document.getElementById('scanner-toggle').addEventListener('click', toggleScanner);
+    document.getElementById('scanner-channel').addEventListener('change', changeChannel);
 });
 
 // Initialize Leaflet Map
@@ -365,4 +371,85 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Scanner functions
+function toggleScanner() {
+    const btn = document.getElementById('scanner-toggle');
+    const status = document.getElementById('scanner-status');
+    const container = document.getElementById('scanner-container');
+    
+    if (!isPlaying) {
+        // Start playing
+        const channelId = document.getElementById('scanner-channel').value;
+        loadScanner(channelId);
+        status.textContent = '⏸ STOP';
+        btn.classList.add('playing');
+        isPlaying = true;
+    } else {
+        // Stop playing
+        if (scannerAudio) {
+            scannerAudio.pause();
+            scannerAudio = null;
+        }
+        container.innerHTML = `
+            <div class="scanner-info">
+                <div class="scanner-attribution">
+                    Audio provided by <a href="https://www.broadcastify.com" target="_blank" rel="noopener">Broadcastify.com</a>
+                </div>
+                <div class="scanner-notice">Click PLAY to start live audio stream</div>
+            </div>
+        `;
+        status.textContent = '▶ PLAY';
+        btn.classList.remove('playing');
+        isPlaying = false;
+    }
+}
+
+function changeChannel() {
+    if (isPlaying) {
+        const channelId = document.getElementById('scanner-channel').value;
+        loadScanner(channelId);
+    }
+}
+
+function loadScanner(channelId) {
+    const container = document.getElementById('scanner-container');
+    
+    // Stop existing audio
+    if (scannerAudio) {
+        scannerAudio.pause();
+    }
+    
+    // Create audio player
+    container.innerHTML = `
+        <div class="scanner-info">
+            <audio id="scanner-audio" controls autoplay style="width: 100%; margin-bottom: 10px;">
+                <source src="https://broadcastify.cdnstream1.com/${channelId}" type="audio/mpeg">
+                Your browser does not support audio streaming.
+            </audio>
+            <div class="scanner-attribution">
+                Audio provided by <a href="https://www.broadcastify.com/listen/feed/${channelId}" target="_blank" rel="noopener">Broadcastify.com</a>
+            </div>
+        </div>
+    `;
+    
+    scannerAudio = document.getElementById('scanner-audio');
+    
+    // Handle audio errors
+    scannerAudio.addEventListener('error', () => {
+        container.innerHTML = `
+            <div class="scanner-info">
+                <div class="scanner-notice" style="color: var(--accent-critical);">
+                    Stream unavailable. Channel may be offline.
+                </div>
+                <div class="scanner-attribution">
+                    Try another channel or visit <a href="https://www.broadcastify.com" target="_blank" rel="noopener">Broadcastify.com</a>
+                </div>
+            </div>
+        `;
+        document.getElementById('scanner-status').textContent = '▶ PLAY';
+        document.getElementById('scanner-toggle').classList.remove('playing');
+        isPlaying = false;
+    });
 }

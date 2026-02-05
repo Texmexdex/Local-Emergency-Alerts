@@ -161,6 +161,94 @@ body {
     color: var(--accent-success);
 }
 
+/* Scanner Panel */
+.scanner-panel {
+    border-left: none;
+}
+
+.scanner-controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.scanner-select {
+    flex: 1;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.scanner-select:focus {
+    outline: none;
+    border-color: var(--accent-info);
+}
+
+.scanner-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 8px 20px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 100px;
+}
+
+.scanner-btn:hover {
+    background: var(--bg-secondary);
+    border-color: var(--accent-success);
+    color: var(--accent-success);
+}
+
+.scanner-btn.playing {
+    border-color: var(--accent-critical);
+    color: var(--accent-critical);
+}
+
+.scanner-player {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    padding: 15px;
+    min-height: 100px;
+}
+
+.scanner-info {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    min-height: 80px;
+}
+
+.scanner-attribution {
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+}
+
+.scanner-attribution a {
+    color: var(--accent-info);
+    text-decoration: none;
+}
+
+.scanner-attribution a:hover {
+    text-decoration: underline;
+}
+
+.scanner-notice {
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.5px;
+}
+
 /* Map Panel */
 .map-panel {
     flex: 1;

@@ -835,53 +835,141 @@ body {
 /* ============================================
    RESPONSIVE UPDATES
    ============================================ */
-@media (max-width: 1400px) {
-    .main-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .center-column {
-        display: none;
-    }
-}
-
+/* Tablet & Small Desktop (Max Width: 1200px) */
+/* Switch to single column stack for better readability */
 @media (max-width: 1200px) {
     .main-grid {
         grid-template-columns: 1fr;
         height: auto;
+        /* Remove fixed height to allow scrolling */
+        gap: 20px;
     }
 
+    /* Change Order: Map First/Top, then Left Panel (Conditions), then Right (Alerts) */
     .center-column {
+        order: -1;
+        /* Move map to top */
+        position: relative;
+        /* Unstick */
+        top: 0;
         display: flex;
+        /* Ensure it is VISIBLE (Fixes bug) */
+        width: 100%;
     }
 
+    .map-panel {
+        width: 100%;
+    }
+
+    #map {
+        height: 500px;
+        /* Fixed height for map in stacked view */
+        min-height: 400px;
+    }
+
+    /* Adjust left/right columns to be full width */
+    .left-column,
+    .right-column {
+        width: 100%;
+    }
+
+    /* Make panels grid for the left column metrics? */
     .wind-data {
         grid-template-columns: repeat(3, 1fr);
     }
 
+    /* Limit height of scrollable areas so page doesn't get infinite */
     .caer-panel,
-    .dispatch-panel {
-        max-height: 60vh;
+    .dispatch-panel,
+    .tceq-events,
+    .weather-alerts {
+        max-height: 400px;
     }
 }
 
+/* Mobile (Max Width: 768px) */
 @media (max-width: 768px) {
+    .container {
+        width: 100%;
+        overflow-x: hidden;
+    }
+
     .header {
         flex-direction: column;
         gap: 15px;
-        align-items: flex-start;
+        align-items: center;
+        text-align: center;
+        padding: 15px;
     }
 
-    .wind-data {
-        grid-template-columns: 1fr;
+    .header-left {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 
     .status-bar {
         flex-direction: column;
-        gap: 5px;
+        gap: 8px;
+        margin-top: 10px;
+        align-items: center;
     }
 
+    .header-right {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+
+    .btn-refresh {
+        width: 100%;
+        max-width: 300px;
+        padding: 12px;
+    }
+
+    /* Stack wind metrics nicely */
+    .wind-data {
+        grid-template-columns: 1fr;
+        gap: 15px;
+        text-align: center;
+    }
+
+    .wind-metric {
+        background: var(--bg-secondary);
+        padding: 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+    }
+
+    /* Adjust Map for mobile */
+    #map {
+        height: 400px;
+    }
+
+    /* Radio controls stack */
     .radio-controls {
         flex-direction: column;
+        align-items: stretch;
+    }
+
+    .radio-select {
+        width: 100%;
+    }
+
+    .auto-switch-label {
+        justify-content: center;
+        padding: 5px;
+    }
+
+    /* Dispatch table horizontal scroll */
+    .dispatch-table-container {
+        overflow-x: auto;
+    }
+
+    .dispatch-table th,
+    .dispatch-table td {
+        white-space: nowrap;
+        padding: 10px 5px;
+        font-size: 10px;
     }
 }

@@ -390,11 +390,11 @@ function changeChannel() {
 function loadScanner(channelId) {
     const container = document.getElementById('scanner-container');
     
-    // Use Broadcastify's official embed widget (no login required)
+    // Use Broadcastify's widget embed format
     container.innerHTML = `
         <div class="scanner-info">
             <iframe 
-                src="https://www.broadcastify.com/listen/embed/${channelId}" 
+                src="https://www.broadcastify.com/widget/?feedId=${channelId}" 
                 height="140" 
                 width="100%" 
                 frameborder="0" 

@@ -60,6 +60,29 @@ The Worker's cron trigger (every 2 minutes) pushes new emergencies to your phone
 
 The Worker's *Logs* tab shows one line per cron run, e.g. `level=clear reasons=0 failed=none sent=0`.
 
+## 4. Plant (CAER) notifications from an Android phone (optional)
+
+Since Oct 20, 2026 the public CAER web page requires a sign-in, but the **EHCMA CAER Online** app still sends push notifications to residents. A spare Android phone, plugged in on WiFi, can forward each notification it receives to your Worker. They're then classified, located and checked for wind direction like the old feed. This is your own copy of alerts sent to you, so keep it private and don't republish it.
+
+1. **KV storage:** this needs the `STATE` KV namespace from step 3.
+2. **Pick a long random token** (about 30+ characters; a password manager can generate one). In Cloudflare: your Worker → *Settings → Variables and Secrets → Add* → type **Secret**, name `INGEST_TOKEN`, value = the token. `/api/health` should then show `"phone_relay": {"enabled": true}`.
+3. **On the phone:**
+   - Install **EHCMA CAER Online** and turn on notifications for every region it lets you subscribe to.
+   - In Android settings, turn off battery optimization for the CAER app and the forwarder app so they aren't put to sleep.
+4. **Install a notification forwarder** that can send an HTTP request when a notification arrives. Tasker with the AutoNotification plugin works; so do apps sold as "notification to webhook" forwarders. Set it to:
+   - **Only** forward notifications from the EHCMA CAER Online app.
+   - Method **POST** to `https://local-emergency-alerts.<subdomain>.workers.dev/api/ingest/notification`
+   - Header `Authorization: Bearer <your token>`. If the app can't set headers, add `?token=<your token>` to the URL instead.
+   - Header `Content-Type: application/json` with body `{"title": "<notification title>", "text": "<notification text>", "app": "<app package>"}`, using the forwarder's own placeholders for title, text and package. Plain-text bodies are also accepted.
+5. **Heartbeat (recommended):** have the phone POST to the same URL with `?heartbeat=1` added (plus the token) about once an hour. Without it, a quiet phone looks the same as an offline one. With it, the dashboard warns you if the phone hasn't checked in for 6 hours.
+6. **Test from a computer:**
+   ```bash
+   curl -X POST "https://local-emergency-alerts.<subdomain>.workers.dev/api/ingest/notification" \
+     -H "Authorization: Bearer <your token>" -H "Content-Type: application/json" \
+     -d '{"title":"Test Facility","text":"*** DRILL *** This is a test notification."}'
+   ```
+   It should answer `{"stored":true,...}`, and the dashboard's Industrial notifications panel should say it's relayed from your phone. A drill won't raise any alarm.
+
 ## Free-plan budget
 
 | Limit (free plan) | Usage |
@@ -76,4 +99,5 @@ The Worker's *Logs* tab shows one line per cron run, e.g. `level=clear reasons=0
 | Page says "Couldn't reach: CAER …; City of Houston …" | `config.js` `apiBase` is empty or wrong, or the Worker is down. Open `<apiBase>/health` |
 | `/api/status` shows `caer` or `houston_fire` with `HTTP 403`/`503` | That upstream site is blocking or down. The rest of the page still works |
 | Fire calls listed as "not mapped" | The Census geocoder couldn't match that dispatch address; it's still listed, just not placed on the map |
+| Plant notifications panel says "not available" even with the phone set up | `/api/health` → `phone_relay.enabled` must be `true`, and the phone must have forwarded at least one notification or heartbeat |
 | No phone alerts | `/api/health` → `monitor.enabled` must be `true`; check the Worker's *Logs* for the cron lines |

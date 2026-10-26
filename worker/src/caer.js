@@ -16,6 +16,7 @@
 import { bearingDeg, compass, distanceKm, round1 } from './geo.js';
 import * as geocode from './geocode.js';
 import { TTLCache, clean, getText, htmlToText, localToEpoch, toLocalIso } from './http.js';
+import * as relay from './relay.js';
 
 export const FEED_URL = 'https://www.incident-reporter.net/e-notifycaerfeed/caermessagelive.html';
 export const cache = new TTLCache(60_000);
@@ -206,11 +207,37 @@ export class FormatError extends Error {
 
 export const APP_INFO_URL = 'https://www.ehcma.org/page/caer-online';
 
+let relayStore = null;
+/** KV namespace holding notifications relayed from the user's phone (see relay.js). */
+export function setRelayStore(kv) { relayStore = kv || null; }
+
+/**
+ * Read the public feed; if it is unavailable (sign-in wall) and the phone
+ * relay is in use, read relayed CAER app notifications instead. The result
+ * array carries a `meta` property saying which path was used.
+ */
 export async function fetchPostings(homeLat, homeLon, now = Date.now()) {
-    const raw = await cache.getOrFetch('feed', async () => parseLivePage(await getText(FEED_URL)));
+    let raw;
+    let meta = { via: 'feed' };
+    try {
+        raw = await cache.getOrFetch('feed', async () => parseLivePage(await getText(FEED_URL)));
+    } catch (err) {
+        if (!err.unavailable || !relayStore) throw err;
+        const r = await relay.recent(relayStore, now);
+        if (r.last_seen_at == null) throw err; // relay never set up
+        if (r.stale) {
+            throw new FormatError(
+                `The public CAER feed is unavailable and the phone relay hasn't checked in since ${toLocalIso(r.last_seen_at)}`,
+                { unavailable: true },
+            );
+        }
+        raw = relay.toRawPostings(r.items);
+        meta = { via: 'relay', last_seen_at: toLocalIso(r.last_seen_at), heartbeat: r.heartbeat, relayed: r.items.length };
+    }
     await resolveLocations(raw);
     const postings = await Promise.all(raw.map((r) => buildPosting(r, homeLat, homeLon, now)));
     postings.sort((a, b) => ORDER[a.level] - ORDER[b.level] || (a.age_hours ?? 1e9) - (b.age_hours ?? 1e9));
+    postings.meta = meta;
     return postings;
 }
 
@@ -222,4 +249,5 @@ export function isCurrent(posting, maxAgeHours = 24) {
 export function _reset() {
     cache.clear();
     facilityAddresses.clear();
+    relayStore = null;
 }

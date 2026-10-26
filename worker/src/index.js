@@ -6,6 +6,7 @@
 // GET /api/geocode?q=<address or place>
 //     Look up coordinates for a home address.
 // GET /api/health
+// POST /api/ingest/notification?token=...   CAER app notifications relayed from your phone
 // GET /api/debug?source=caer|caer_app|houston|keymap|probe   what an upstream feed returned
 //
 // The cron trigger (wrangler.toml) runs the ntfy phone-push monitor.
@@ -16,6 +17,7 @@ import * as geocode from './geocode.js';
 import * as houston from './houston.js';
 import { TTLCache, clean, getJson, htmlToText } from './http.js';
 import * as keymap from './keymap.js';
+import * as relay from './relay.js';
 import { runMonitor } from './monitor.js';
 
 const CORS = {
@@ -201,11 +203,46 @@ async function debugRoute(params) {
     }
 }
 
+function safeEqual(a, b) {
+    if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+    return diff === 0;
+}
+
+// Receives notifications forwarded by an app on your Android phone.
+async function ingestRoute(request, env, url) {
+    if (!env.INGEST_TOKEN || !env.STATE) {
+        return json({ error: 'relay not configured: set the INGEST_TOKEN secret and bind the STATE KV namespace' }, 503);
+    }
+    const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '') || url.searchParams.get('token') || '';
+    if (!safeEqual(token, env.INGEST_TOKEN)) return json({ error: 'unauthorized' }, 401);
+    let payload;
+    const type = request.headers.get('Content-Type') || '';
+    try {
+        if (type.includes('json')) payload = await request.json();
+        else if (type.includes('form')) payload = Object.fromEntries(await request.formData());
+        else {
+            const text = await request.text();
+            try { payload = JSON.parse(text); } catch { payload = { text }; }
+        }
+    } catch {
+        return json({ error: 'could not read request body' }, 400);
+    }
+    if (url.searchParams.get('heartbeat')) payload = { heartbeat: true };
+    const result = await relay.ingest(env.STATE, payload);
+    return json(result, result.error ? 400 : 202);
+}
+
 export default {
     async fetch(request, env, ctx) {
         if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-        if (request.method !== 'GET') return json({ error: 'method not allowed' }, 405);
         const url = new URL(request.url);
+        if (url.pathname.replace(/\/+$/, '') === '/api/ingest/notification') {
+            return request.method === 'POST' ? ingestRoute(request, env, url) : json({ error: 'use POST' }, 405);
+        }
+        if (request.method !== 'GET') return json({ error: 'method not allowed' }, 405);
+        caer.setRelayStore(env.STATE);
         switch (url.pathname.replace(/\/+$/, '')) {
             case '/api/status':
                 return status(url.searchParams, env, ctx);
@@ -220,6 +257,7 @@ export default {
                     default_location: { lat: DEFAULT_LAT, lon: DEFAULT_LON, label: DEFAULT_LABEL },
                     sources: Object.fromEntries(Object.entries(SOURCES).map(([k, [name]]) => [k, name])),
                     monitor: { enabled: Boolean(env.NTFY_TOPIC && env.STATE), kv_bound: Boolean(env.STATE) },
+                    phone_relay: { enabled: Boolean(env.INGEST_TOKEN && env.STATE) },
                 });
             case '':
                 return json({ service: 'Local Emergency Alerts API', endpoints: ['/api/status', '/api/geocode', '/api/health'] });
@@ -229,6 +267,7 @@ export default {
     },
 
     async scheduled(event, env, ctx) {
+        caer.setRelayStore(env.STATE);
         await geocode.loadPersisted(env.STATE);
         console.log(await runMonitor(env));
         ctx.waitUntil(geocode.savePersisted(env.STATE));

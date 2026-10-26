@@ -564,6 +564,12 @@ function renderCaer(s) {
     if (!active.length && !settings.showRoutine) {
         items.unshift(el('p', { class: 'empty', text: `✓ No active industrial incidents. ${all.length} routine posting${all.length === 1 ? '' : 's'} (flaring, drills, all-clears) hidden.` }));
     }
+    const meta = s.sources.caer.meta;
+    if (meta?.via === 'relay') {
+        items.unshift(el('p', { class: 'muted', text:
+            `Relayed from your phone's CAER app · last check-in ${ago(meta.last_seen_at)}`
+            + (meta.heartbeat ? '' : ' (no heartbeat set up, so a quiet phone looks the same as an offline one)') }));
+    }
     list.replaceChildren(...items);
 }
 

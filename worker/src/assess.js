@@ -36,7 +36,8 @@ const mi = (km) => round1(kmToMi(km));
 async function run(fn, lat, lon) {
     const started = Date.now();
     try {
-        return { ok: true, data: await fn(lat, lon), error: null, ms: Date.now() - started };
+        const data = await fn(lat, lon);
+        return { ok: true, data, meta: data?.meta ?? null, error: null, ms: Date.now() - started };
     } catch (err) { // each source fails independently
         return {
             ok: false, data: null, unavailable: Boolean(err?.unavailable),
@@ -122,6 +123,7 @@ export function build(lat, lon, results, { radiusKm = DEFAULT_RADIUS_KM, label =
         sources: Object.fromEntries(Object.keys(SOURCES).filter((k) => results[k]).map((k) => [k, {
             name: SOURCES[k][0], ok: results[k].ok, error: results[k].error, ms: results[k].ms,
             unavailable: Boolean(results[k].unavailable),
+            meta: results[k].meta ?? null,
             count: Array.isArray(results[k].data) ? results[k].data.length : null,
         }])),
         alerts,

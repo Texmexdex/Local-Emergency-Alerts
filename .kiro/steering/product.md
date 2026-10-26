@@ -8,7 +8,7 @@ Local Emergency Alerts answers one question for people living near the Houston S
 - Never report a plain "all clear" when a source failed; name the failed sources and link to them.
 - Routine industrial postings (planned flaring, drills, weekly alarm tests, all-clears) must not raise the level.
 - Wind-aware: an active industrial incident upwind of the user escalates, using *observed* wind.
-- Notifications only for new or escalated items: browser notifications while the page is open; ntfy phone push via a scheduled GitHub Action when it's closed.
+- Notifications only for new or escalated items: browser notifications while the page is open; ntfy phone push from the Worker's cron trigger when it's closed.
 
 ## Data sources
 
@@ -16,7 +16,7 @@ Local Emergency Alerts answers one question for people living near the Houston S
 - NWS station observations (wind)
 - CAER live postings (incident-reporter.net)
 - City of Houston Fire/EMS active incidents (City of Houston only)
-- US Census geocoder (addresses), Open-Meteo (modeled AQI)
+- US Census geocoder (addresses; batch endpoint for dispatch), Open-Meteo (modeled AQI)
 
 ## Accuracy rules
 

@@ -21,10 +21,10 @@ If any source can't be reached, the page says so explicitly. It never shows a pl
 
 | Source | What it provides | Notes |
 |---|---|---|
-| [NWS alerts API](https://www.weather.gov/documentation/services-web-api) | Official alerts for your exact point, weather **and** non-weather (shelter in place, hazmat, civil emergency, evacuation) | The most authoritative source; also fetched straight from the browser if the backend is down |
+| [NWS alerts API](https://www.weather.gov/documentation/services-web-api) | Official alerts for your exact point, weather **and** non-weather (shelter in place, hazmat, civil emergency, evacuation) | The most authoritative source; also fetched straight from the browser if the data server is unreachable |
 | NWS station observations | **Measured** wind direction/speed from the nearest station | Used for downwind checks; falls back to the hourly forecast only if no station has a fresh reading |
 | [CAER live postings](https://www.incident-reporter.net/e-notifycaerfeed/caermessagelive.html) | Community notifications posted by member plants (EHCMA e-Notify) | Each posting is classified: drill / all-clear / routine notice / incident / shelter-evacuate. Location comes from the address in the plant's own message |
-| [City of Houston active incidents](https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx) | Live Fire/EMS calls | Addresses geocoded with the US Census geocoder. **City of Houston only**: unincorporated Harris County (Channelview, Sheldon, Crosby) isn't in this feed |
+| [City of Houston active incidents](https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx) | Live Fire/EMS calls | Addresses geocoded with the US Census batch geocoder. **City of Houston only**: unincorporated Harris County (Channelview, Sheldon, Crosby) isn't in this feed |
 | [Open-Meteo air quality](https://open-meteo.com/en/docs/air-quality-api) | Regional AQI estimate | A model, not a monitor. It won't see a local plume. See AirNow for official readings |
 
 ### How "downwind" works
@@ -40,47 +40,47 @@ For every active industrial incident, it compares the observed wind with the dir
 
 ## Architecture
 
+Everything runs on free tiers with nothing that sleeps:
+
 ```
-GitHub Pages (index.html, app.js, style.css)
+GitHub Pages (index.html, app.js, style.css, config.js)
       │  GET /api/status?lat=&lon=&radius_mi=
       ▼
-Hugging Face Docker Space (api/)  ── Flask + gunicorn
-      ├─ emergency/nws.py      NWS alerts + observed wind
-      ├─ emergency/caer.py     CAER feed parser + classifier
-      ├─ emergency/houston.py  Houston Fire/EMS parser + classifier
-      ├─ emergency/geocode.py  US Census geocoder (cached)
-      ├─ emergency/assess.py   combines everything into one level + reasons
-      └─ emergency/monitor.py  ntfy push notifier (run by GitHub Actions)
+Cloudflare Worker (worker/)      always on, free plan
+      ├─ src/nws.js        NWS alerts + observed wind
+      ├─ src/caer.js       CAER feed parser + classifier
+      ├─ src/houston.js    Houston Fire/EMS parser + classifier
+      ├─ src/geocode.js    US Census geocoder (batch for dispatch addresses)
+      ├─ src/assess.js     combines everything into one level + reasons
+      └─ src/monitor.js    cron every 2 min → ntfy phone push (state in KV)
 ```
 
-Free Hugging Face Spaces go to sleep when idle. If the backend takes more than 7 seconds, the page shows official NWS alerts fetched directly from weather.gov while the server wakes up, then fills in the industrial and fire data.
+The Worker is built to fit the free plan's limits: 100,000 requests/day, 10 ms CPU and 50 outbound requests per invocation. Feeds are cached for 60 seconds, all Houston dispatch addresses are geocoded in **one** Census batch request, and KV storage is written only when something changes.
+
+If the Worker can't be reached, the page still shows official NWS alerts and wind fetched directly from weather.gov, and says that the industrial and fire feeds are missing.
+
+**Setup:** see [DEPLOYMENT.md](DEPLOYMENT.md). It takes about 10 minutes with a free Cloudflare account.
 
 ## Phone alerts (ntfy)
 
-`.github/workflows/monitor.yml` runs every 10 minutes and pushes **new or escalated** items to your phone via [ntfy](https://ntfy.sh). It also sends an "All clear" once things end, and a one-time warning if the feeds have been unreachable for about an hour.
+The Worker's cron trigger runs every 2 minutes and pushes **new or escalated** items to your phone via [ntfy](https://ntfy.sh). It also sends one "All clear" when things end, and a one-time warning if the feeds have been unreachable for about an hour.
 
 1. Install the ntfy app (iOS/Android) and subscribe to a long, random topic name, e.g. `lea-7f3k9q2m8x`. Anyone who knows the topic can read it.
-2. In GitHub → Settings → Secrets and variables → Actions:
-   - **Secret** `NTFY_TOPIC` = your topic name
-   - **Variables** (optional) `HOME_LAT`, `HOME_LON`, `HOME_LABEL`, `RADIUS_MI` (default 10), `NOTIFY_MIN_LEVEL` (`action` / `warning` / `advisory`, default `warning`)
-3. Run the workflow once manually (Actions → *Emergency monitor* → Run workflow) to check it works.
+2. Follow [DEPLOYMENT.md → Phone alerts](DEPLOYMENT.md#3-phone-alerts-optional) to create the KV namespace and set the `NTFY_TOPIC` secret.
+3. Set your home location in `worker/wrangler.toml` (`HOME_LAT`, `HOME_LON`, `HOME_LABEL`, `RADIUS_MI`, `NOTIFY_MIN_LEVEL`).
 
-GitHub runs scheduled workflows on a best-effort basis (delays of several minutes happen) and pauses them after 60 days with no repository activity. Treat this as a backup to Ready Harris / WEA, not a replacement.
+Treat this as a backup to Ready Harris and Wireless Emergency Alerts, not a replacement.
 
 ## Development
 
 ```bash
-cd api
-python -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt pytest
-pytest -q                         # parser/classifier/assessment tests (no network)
-python app.py                     # API on http://127.0.0.1:7860
-python -m emergency.monitor --dry-run   # see what would be pushed
+cd worker
+npm install
+npm test              # parser/classifier/assessment/Worker tests (no network)
+npm run dev           # Worker on http://127.0.0.1:8787 (cron test: /__scheduled)
 ```
 
-Then serve the frontend from the repo root (`python -m http.server 8000`) and open http://localhost:8000. On localhost it automatically talks to `http://127.0.0.1:7860/api`; elsewhere you can point it at any backend with `?api=https://.../api`.
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for deploying the frontend and backend.
+Then serve the frontend from the repo root (`python -m http.server 8000`) and open http://localhost:8000. On localhost it talks to `http://127.0.0.1:8787/api` automatically; anywhere else you can point it at a Worker with `?api=https://.../api`.
 
 ---
 

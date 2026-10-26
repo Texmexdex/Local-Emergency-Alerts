@@ -1,12 +1,8 @@
-# Python
-__pycache__/
-*.pyc
-.pytest_cache/
-venv/
-.venv/
-
-# Local monitor state
-.monitor-state/
+# Node / Wrangler
+node_modules/
+.wrangler/
+worker/dist/
+.dev.vars
 
 # IDE / OS
 .vscode/

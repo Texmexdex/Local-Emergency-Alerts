@@ -1,0 +1,30 @@
+name = "local-emergency-alerts"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# Phone-push monitor: every 2 minutes. Needs the STATE KV namespace below and
+# the NTFY_TOPIC secret; without them the cron run exits immediately.
+[triggers]
+crons = ["*/2 * * * *"]
+
+[vars]
+HOME_LAT = "29.7761"
+HOME_LON = "-95.1144"
+HOME_LABEL = "Channelview, TX"
+RADIUS_MI = "10"
+NOTIFY_MIN_LEVEL = "warning"   # action | warning | advisory
+DASHBOARD_URL = "https://texmexdex.github.io/Local-Emergency-Alerts/"
+NTFY_SERVER = "https://ntfy.sh"
+# NTFY_TOPIC is a secret: `npx wrangler secret put NTFY_TOPIC` (or set it in the dashboard).
+
+# Stores phone-push state and saved plant locations. The dashboard API works
+# without it; the phone monitor needs it. To enable: run
+#   npx wrangler kv namespace create STATE
+# then uncomment these lines and paste the id it prints.
+# [[kv_namespaces]]
+# binding = "STATE"
+# id = "paste-id-here"
+
+[observability]
+enabled = true

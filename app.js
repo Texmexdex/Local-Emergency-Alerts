@@ -1,13 +1,13 @@
 // Local Emergency Alerts — frontend
-// Talks to the Flask API (api/app.py) for the combined assessment. If that
-// server is slow (Hugging Face Spaces sleep when idle) or down, it falls back
-// to the NWS API directly so official alerts are never blocked on it.
+// Talks to the Cloudflare Worker (worker/) for the combined assessment. If it
+// is slow or unreachable, it falls back to the NWS API directly so official
+// alerts are never blocked on it.
 
 const params = new URLSearchParams(location.search);
-const API_BASE = params.get('api') ||
+const API_BASE = (params.get('api') ||
     (['localhost', '127.0.0.1'].includes(location.hostname)
-        ? 'http://127.0.0.1:7860/api'
-        : 'https://texmexdex-local-emergency-alerts.hf.space/api');
+        ? 'http://127.0.0.1:8787/api' // `npm run dev` in worker/
+        : window.LEA_CONFIG?.apiBase) || '').replace(/\/+$/, '');
 const NWS = 'https://api.weather.gov';
 const REFRESH_MS = 60 * 1000;
 const SLOW_BACKEND_MS = 7000;
@@ -17,7 +17,7 @@ const LEVELS = ['clear', 'info', 'advisory', 'warning', 'action'];
 const LEVEL_TEXT = { action: 'Act now', warning: 'Warning', advisory: 'Advisory', info: 'Routine', clear: 'All clear' };
 const KIND_TEXT = { drill: 'Drill', all_clear: 'All clear', notice: 'Routine notice', incident: 'Incident', protective_action: 'Shelter / evacuate' };
 const ICONS = { action: '!', warning: '!', advisory: 'i', clear: '✓', loading: '…' };
-// Mirrors ACTION_EVENTS in api/emergency/nws.py
+// Mirrors ACTION_EVENTS in worker/src/nws.js
 const NWS_ACTION_EVENTS = new Set([
     'Tornado Warning', 'Extreme Wind Warning', 'Shelter In Place Warning', 'Evacuation Immediate',
     'Hazardous Materials Warning', 'Civil Danger Warning', 'Civil Emergency Message', 'Local Area Emergency',
@@ -345,12 +345,13 @@ async function refresh() {
     let settled = false;
     const slow = setTimeout(async () => {
         if (settled) return;
-        $('checked-at').textContent = 'Waking up data server…';
+        $('checked-at').textContent = 'Still loading…';
         const nws = await nwsDirect();
         if (!settled) render(fallbackStatus(nws, true, null));
     }, SLOW_BACKEND_MS);
     try {
-        const status = await fetchJSON(`${API_BASE}/status?${q}`, { timeout: 75000 });
+        if (!API_BASE) throw new Error('not configured: set apiBase in config.js');
+        const status = await fetchJSON(`${API_BASE}/status?${q}`, { timeout: 45000 });
         settled = true;
         render(status);
     } catch (err) {
@@ -442,7 +443,7 @@ function renderStatus(s) {
     const notice = $('status-notice');
     notice.replaceChildren();
     if (s.pending) {
-        notice.append('Showing official NWS alerts while the industrial and fire feeds load (the data server may take up to a minute to wake up).');
+        notice.append('Showing official NWS alerts while the industrial and fire feeds finish loading.');
     } else if (!s.complete && s.failed_sources?.length) {
         notice.append(
             el('strong', { text: 'This may not be the full picture. ' }),
@@ -482,7 +483,7 @@ function longText(text, n) {
 
 function unavailable(source, s) {
     const src = s.sources?.[source] || {};
-    if (src.pending) return el('p', { class: 'muted', text: 'Loading… (data server waking up)' });
+    if (src.pending) return el('p', { class: 'muted', text: 'Loading…' });
     return el('div', { class: 'unavailable' },
         'This feed is unavailable right now. ',
         el('a', { href: SOURCE_LINKS[source], target: '_blank', rel: 'noopener', text: 'Open the source directly' }), '.');
@@ -655,6 +656,7 @@ async function searchLocation() {
     out.replaceChildren(el('li', { class: 'muted', text: 'Searching…' }));
     let results = [];
     try {
+        if (!API_BASE) throw new Error('no data server');
         results = (await fetchJSON(`${API_BASE}/geocode?q=${encodeURIComponent(q)}`, { timeout: 25000 })).results || [];
     } catch { /* fall through to OpenStreetMap */ }
     if (!results.length) {

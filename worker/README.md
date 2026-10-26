@@ -1,16 +1,6 @@
----
-title: Local Emergency Alerts API
-emoji: 🚨
-colorFrom: red
-colorTo: gray
-sdk: docker
-app_port: 7860
-pinned: false
----
+# Local Emergency Alerts: Worker
 
-# Local Emergency Alerts API
-
-Backend for [Local Emergency Alerts](https://github.com/texmexdex/local-emergency-alerts). It combines NWS alerts, observed wind, CAER industrial notifications and City of Houston Fire/EMS incidents into one assessment for a location.
+Cloudflare Worker that serves the dashboard's data and runs the phone-push monitor. See [DEPLOYMENT.md](../DEPLOYMENT.md) for setup.
 
 ## Endpoints
 
@@ -21,8 +11,6 @@ Backend for [Local Emergency Alerts](https://github.com/texmexdex/local-emergenc
 | `lat`, `lon` | Channelview, TX | Home location (US only) |
 | `radius_mi` or `radius_km` | 10 mi | How far an industrial/fire incident still counts as "near" |
 | `label` | | Display name for the location |
-
-Returns:
 
 ```jsonc
 {
@@ -45,13 +33,16 @@ Returns:
 US Census geocoder, with an OpenStreetMap Nominatim fallback for place names.
 
 ### `GET /api/health`
+Includes `monitor.enabled` (true once the `STATE` KV binding and `NTFY_TOPIC` secret are set).
 
-## Running locally
+## Cron
+
+`*/2 * * * *` runs `src/monitor.js`: assess `HOME_LAT`/`HOME_LON`, push new or escalated reasons at or above `NOTIFY_MIN_LEVEL` to ntfy, and store what was sent in KV (written only on change).
+
+## Development
 
 ```bash
-pip install -r requirements.txt pytest
-pytest -q
-python app.py   # http://127.0.0.1:7860
+npm install
+npm test          # node:test, no network
+npm run dev       # http://127.0.0.1:8787 ; trigger cron with /__scheduled
 ```
-
-Upstream responses are cached in memory (alerts/feeds 60 s, observations 5 min, geocodes 7 days), so many viewers don't multiply requests to the source sites.

@@ -1,58 +1,79 @@
 # Deployment
 
-Two free pieces:
+Two free pieces, neither of which sleeps:
 
-- **Frontend**: GitHub Pages serving `index.html`, `app.js` and `style.css` from the repository root.
-- **Backend**: a Hugging Face Docker Space built from the `api/` folder.
+- **Data server**: a Cloudflare Worker built from the `worker/` folder.
+- **Website**: GitHub Pages serving `index.html`, `app.js`, `style.css` and `config.js` from the repository root.
 
-## Backend (Hugging Face Space)
+## 1. Deploy the Worker
 
-The Space already exists at `https://huggingface.co/spaces/Texmexdex/Local-Emergency-Alerts` and serves `https://texmexdex-local-emergency-alerts.hf.space`.
+You need a free Cloudflare account: https://dash.cloudflare.com/sign-up. When it asks, choose your **workers.dev subdomain**. Your Worker's address will be `https://local-emergency-alerts.<subdomain>.workers.dev`.
 
-### Automatic (recommended)
+### Option A: from the Cloudflare dashboard, deploying automatically from GitHub (no command line)
 
-`.github/workflows/deploy-backend.yml` runs the tests and then pushes `api/` to the Space whenever `api/**` changes on `main`.
+1. In the Cloudflare dashboard go to **Workers & Pages → Create** and choose to import a Git repository.
+2. Connect GitHub and pick `Texmexdex/Local-Emergency-Alerts`.
+3. Set the **root directory** to `worker`. Leave the deploy command as `npx wrangler deploy`.
+4. Deploy. From then on, every push to `main` redeploys the Worker automatically.
 
-1. Create a Hugging Face **write** token: huggingface.co → Settings → Access Tokens.
-2. Add it to GitHub as repository secret `HF_TOKEN` (Settings → Secrets and variables → Actions).
-3. If your Space has a different name, add repository variable `HF_SPACE` (e.g. `your-name/your-space`).
-4. Push to `main`, or run *Deploy backend to Hugging Face* from the Actions tab.
+(Cloudflare occasionally renames these screens; the steps are "create a Worker from a Git repository, with root directory `worker`".)
 
-The workflow force-pushes the contents of `api/` as the Space's `main` branch, so the GitHub repo is the source of truth.
-
-### Manual
+### Option B: from your computer
 
 ```bash
-git clone https://huggingface.co/spaces/Texmexdex/Local-Emergency-Alerts hf-space
-cp -r api/* hf-space/            # app.py, emergency/, Dockerfile, requirements.txt, README.md
-cd hf-space && git add -A && git commit -m "Update backend" && git push
+cd worker
+npm install
+npx wrangler login      # opens a browser to authorize
+npx wrangler deploy     # prints your Worker URL
 ```
 
-`api/README.md` contains the Space's configuration header (`sdk: docker`, `app_port: 7860`). Keep it.
+### Check it
 
-Check it after the build finishes (2–5 min):
+Open `https://local-emergency-alerts.<subdomain>.workers.dev/api/status`. The `sources` block shows whether each upstream feed responded and, if not, the error. All four should say `"ok": true`.
 
-- `https://texmexdex-local-emergency-alerts.hf.space/api/health`
-- `https://texmexdex-local-emergency-alerts.hf.space/api/status`
+> This is the first time the code talks to the real feeds, so this check matters. If `caer` or `houston_fire` shows an error such as `HTTP 403`, that site is refusing requests from Cloudflare's servers; the error text says which.
 
-The `sources` block in `/api/status` shows whether each upstream feed responded and, if not, the error.
+## 2. Point the website at the Worker
 
-## Frontend (GitHub Pages)
+1. Edit `config.js` in the repo root:
+   ```js
+   window.LEA_CONFIG = {
+       apiBase: 'https://local-emergency-alerts.<subdomain>.workers.dev/api',
+   };
+   ```
+2. Commit and push to `main`.
+3. If GitHub Pages isn't on yet: GitHub → Settings → Pages → *Deploy from a branch*, branch `main`, folder `/ (root)`. The site is at `https://texmexdex.github.io/Local-Emergency-Alerts/`.
 
-1. GitHub → Settings → Pages → Source: *Deploy from a branch*, Branch `main`, folder `/ (root)`.
-2. The site appears at `https://texmexdex.github.io/Local-Emergency-Alerts/`.
+## 3. Phone alerts (optional)
 
-The API URL is set at the top of `app.js` (`API_BASE`). If you move the backend, change it there, or test without editing using `?api=https://your-backend/api`.
+The Worker's cron trigger (every 2 minutes) pushes new emergencies to your phone through [ntfy](https://ntfy.sh). It needs somewhere to remember what it already sent (a KV namespace) and your ntfy topic.
 
-## Phone push (optional)
+1. **Create the KV namespace.**
+   - Dashboard: *Storage & Databases → KV → Create*, name it `STATE`, and copy its ID.
+   - Or command line: `cd worker && npx wrangler kv namespace create STATE`.
+2. **Bind it.** In `worker/wrangler.toml`, uncomment the `[[kv_namespaces]]` block and paste the ID. (KV IDs aren't secret, so they're fine to commit.)
+3. **Set your location** in `worker/wrangler.toml` under `[vars]`: `HOME_LAT`, `HOME_LON`, `HOME_LABEL`, `RADIUS_MI`, and `NOTIFY_MIN_LEVEL` (`action`, `warning` or `advisory`). Change these in the file, not the dashboard: each deploy resets dashboard variables to what's in `wrangler.toml`. Secrets are kept.
+4. **Set the topic as a secret.**
+   - Dashboard: your Worker → *Settings → Variables and Secrets → Add* → type *Secret*, name `NTFY_TOPIC`, value = your topic.
+   - Or command line: `npx wrangler secret put NTFY_TOPIC`.
+5. Push (or `npx wrangler deploy`). `/api/health` should now show `"monitor": {"enabled": true, ...}`.
 
-See [README → Phone alerts](README.md#phone-alerts-ntfy). Requires only the `NTFY_TOPIC` secret.
+The Worker's *Logs* tab shows one line per cron run, e.g. `level=clear reasons=0 failed=none sent=0`.
+
+## Free-plan budget
+
+| Limit (free plan) | Usage |
+|---|---|
+| 100,000 requests/day | ~720 cron runs/day plus one request per open dashboard per minute |
+| 10 ms CPU per invocation | Parsing a worst-case feed page takes ~2–3 ms, and parsed feeds are cached for 60 s |
+| 50 outbound requests per invocation | About 10 when warm; up to ~25 the first time new addresses are geocoded |
+| KV writes/day | Only when something changes: new alerts, new plant addresses |
 
 ## Troubleshooting
 
 | Symptom | Check |
 |---|---|
-| Page says "Showing official NWS alerts while the industrial and fire feeds load" for a long time | The Space is waking up or failed to build. Open the Space's *Logs* tab |
-| "Couldn't reach: CAER …" | The CAER site may be down or blocking the Space. Error text is in `/api/status` → `sources.caer.error` |
-| Fire calls listed as "not mapped" | The Census geocoder couldn't match that dispatch address; it is still listed, just not placed on the map |
-| Scheduled monitor stopped | GitHub disables scheduled workflows after 60 days of no repository activity. Re-enable it in the Actions tab |
+| Page says "Couldn't reach: CAER …; City of Houston …" | `config.js` `apiBase` is empty or wrong, or the Worker is down. Open `<apiBase>/health` |
+| `/api/status` shows `caer` or `houston_fire` with `HTTP 403`/`503` | That upstream site is blocking or down. The rest of the page still works |
+| Fire calls listed as "not mapped" | The Census geocoder couldn't match that dispatch address; it's still listed, just not placed on the map |
+| No phone alerts | `/api/health` → `monitor.enabled` must be `true`; check the Worker's *Logs* for the cron lines |

@@ -178,14 +178,33 @@ async function resolveLocations(raw) {
 export function parseLivePage(html) {
     const postings = parseFeed(html);
     if (!postings.length && !/CAER Message Postings/i.test(html) && !/Posted On\s*-/i.test(html)) {
-        throw new FormatError('CAER page format not recognised (messages are loaded by JavaScript); cannot read the feed');
+        if (/eNotify|flutter/i.test(html)) {
+            throw new FormatError(
+                'CAER messages are no longer on the public web page (the feed now opens a sign-in screen). '
+                + 'Plant notifications are available in the EHCMA CAER Online app.',
+                { unavailable: true },
+            );
+        }
+        throw new FormatError('CAER page format not recognised; cannot read the feed');
     }
     return postings;
 }
 
+/**
+ * The page wasn't in a format we can read. `unavailable` marks the known
+ * case where the public feed has been replaced by a sign-in app, so the
+ * dashboard can explain it instead of showing a generic failure. If the
+ * public page returns, parsing resumes automatically.
+ */
 export class FormatError extends Error {
-    constructor(message) { super(message); this.name = 'FormatError'; }
+    constructor(message, { unavailable = false } = {}) {
+        super(message);
+        this.name = 'FormatError';
+        this.unavailable = unavailable;
+    }
 }
+
+export const APP_INFO_URL = 'https://www.ehcma.org/page/caer-online';
 
 export async function fetchPostings(homeLat, homeLon, now = Date.now()) {
     const raw = await cache.getOrFetch('feed', async () => parseLivePage(await getText(FEED_URL)));

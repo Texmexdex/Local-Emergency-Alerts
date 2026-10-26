@@ -100,5 +100,11 @@ test('an unrecognised page is a failure, never "no messages"', async () => {
     // A genuinely empty feed in the known format is fine.
     assert.deepEqual(caer.parseLivePage('<html><head><title>CAER Message Postings</title></head><body></body></html>'), []);
     mockFetch({ 'incident-reporter.net': () => spa });
-    await assert.rejects(caer.fetchPostings(...HOME, NOW), /format not recognised/);
+    await assert.rejects(caer.fetchPostings(...HOME, NOW), /sign-in screen/);
+});
+
+test('the sign-in app page is reported as unavailable with a clear reason', async () => {
+    const app = '<html><head><title>eNotify - Emergency Notification System</title></head><body>Initializing...<script src="flutter.js"></script></body></html>';
+    assert.throws(() => caer.parseLivePage(app), (err) => err.unavailable === true && /sign-in/.test(err.message));
+    assert.throws(() => caer.parseLivePage('<html><body>Something else</body></html>'), (err) => err.unavailable === false);
 });

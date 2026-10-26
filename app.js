@@ -29,6 +29,7 @@ const SOURCE_NAMES = {
     caer: 'CAER industrial community notifications',
     houston_fire: 'City of Houston Fire/EMS active incidents',
 };
+const CAER_APP_URL = 'https://www.ehcma.org/page/caer-online';
 const SOURCE_LINKS = {
     caer: 'https://www.incident-reporter.net/e-notifycaerfeed/caermessagelive.html',
     houston_fire: 'https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx',
@@ -453,13 +454,25 @@ function renderStatus(s) {
             ...['caer', 'houston_fire'].flatMap((k, i) => [i ? ' · ' : '', el('a', { href: SOURCE_LINKS[k], target: '_blank', rel: 'noopener', text: SOURCE_NAMES[k] })]),
         );
     } else if (!s.complete && s.failed_sources?.length) {
-        notice.append(
-            el('strong', { text: 'This may not be the full picture. ' }),
-            `Couldn't get data from: ${s.failed_sources.join('; ')}. `,
-            'Check those sources directly: ',
-            ...Object.entries(SOURCE_LINKS).filter(([k]) => s.sources?.[k] && !s.sources[k].ok)
-                .flatMap(([k, url], i) => [i ? ', ' : '', el('a', { href: url, target: '_blank', rel: 'noopener', text: SOURCE_NAMES[k] })]),
-        );
+        const caerGone = Boolean(s.sources?.caer?.unavailable);
+        const failedKeys = Object.keys(SOURCE_LINKS).filter((k) => s.sources?.[k] && !s.sources[k].ok && !(k === 'caer' && caerGone));
+        if (failedKeys.length) {
+            notice.append(
+                el('strong', { text: 'This may not be the full picture. ' }),
+                `Couldn't get data from: ${failedKeys.map((k) => SOURCE_NAMES[k]).join('; ')}. `,
+                'Check those sources directly: ',
+                ...failedKeys.flatMap((k, i) => [i ? ', ' : '', el('a', { href: SOURCE_LINKS[k], target: '_blank', rel: 'noopener', text: SOURCE_NAMES[k] })]),
+            );
+        }
+        if (caerGone) {
+            if (failedKeys.length) notice.append(el('br'));
+            notice.append(
+                el('strong', { text: 'Plant (CAER) notifications are not included. ' }),
+                'EHCMA no longer publishes them on the public web; they are in the ',
+                el('a', { href: CAER_APP_URL, target: '_blank', rel: 'noopener', text: 'EHCMA CAER Online app' }),
+                '. Official shelter-in-place and hazmat orders still come through the NWS alerts here.',
+            );
+        }
     }
     notice.hidden = !notice.childNodes.length;
 
@@ -492,6 +505,14 @@ function longText(text, n) {
 function unavailable(source, s) {
     const src = s.sources?.[source] || {};
     if (src.pending) return el('p', { class: 'muted', text: 'Loading…' });
+    if (source === 'caer' && src.unavailable) {
+        return el('div', { class: 'unavailable' },
+            el('strong', { text: 'Not available on the public web. ' }),
+            "Since Oct 20, 2026 the CAER message page requires a sign-in, so this tool can't read plant notifications. ",
+            'For plant alerts (flaring, releases, shelter-in-place messages from facilities), install the ',
+            el('a', { href: CAER_APP_URL, target: '_blank', rel: 'noopener', text: 'EHCMA CAER Online app' }),
+            ' and turn on its notifications. This panel will fill in automatically if the public feed returns.');
+    }
     return el('div', { class: 'unavailable' },
         'This feed is unavailable right now. ',
         el('a', { href: SOURCE_LINKS[source], target: '_blank', rel: 'noopener', text: 'Open the source directly' }), '.');

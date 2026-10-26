@@ -136,6 +136,7 @@ test('status reports CAER as failed (not all clear) when the page format changes
     const body = await (await get('/api/status')).json();
     assert.equal(body.sources.caer.ok, false);
     assert.match(body.sources.caer.error, /FormatError/);
+    assert.equal(body.sources.caer.unavailable, true);
     assert.equal(body.complete, false);
     assert.match(body.headline, /sources that responded/);
 });

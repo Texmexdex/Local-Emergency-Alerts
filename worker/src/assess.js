@@ -38,7 +38,10 @@ async function run(fn, lat, lon) {
     try {
         return { ok: true, data: await fn(lat, lon), error: null, ms: Date.now() - started };
     } catch (err) { // each source fails independently
-        return { ok: false, data: null, error: `${err?.name || 'Error'}: ${err?.message || err}`.slice(0, 300), ms: Date.now() - started };
+        return {
+            ok: false, data: null, unavailable: Boolean(err?.unavailable),
+            error: `${err?.name || 'Error'}: ${err?.message || err}`.slice(0, 300), ms: Date.now() - started,
+        };
     }
 }
 
@@ -118,6 +121,7 @@ export function build(lat, lon, results, { radiusKm = DEFAULT_RADIUS_KM, label =
         failed_sources: failed,
         sources: Object.fromEntries(Object.keys(SOURCES).filter((k) => results[k]).map((k) => [k, {
             name: SOURCES[k][0], ok: results[k].ok, error: results[k].error, ms: results[k].ms,
+            unavailable: Boolean(results[k].unavailable),
             count: Array.isArray(results[k].data) ? results[k].data.length : null,
         }])),
         alerts,

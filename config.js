@@ -4,5 +4,5 @@
 // Until this is set, the page still shows official NWS alerts and wind,
 // fetched straight from weather.gov, but not the industrial or fire feeds.
 window.LEA_CONFIG = {
-    apiBase: '',
+    apiBase: 'https://local-emergency-alerts.he-texmexdex.workers.dev/api',
 };

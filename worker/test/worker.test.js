@@ -140,3 +140,18 @@ test('status reports CAER as failed (not all clear) when the page format changes
     assert.equal(body.complete, false);
     assert.match(body.headline, /sources that responded/);
 });
+
+test('probe debug summarizes a candidate page', async () => {
+    mockFetch({
+        'tceq.texas.gov': () => '<html><head><title>Lynchburg Ferry C1015</title></head><body>'
+            + '<a href="/cgi-bin/compliance/monops/agc_daily_summary.pl?cams=1015">AutoGC Hourly Averages</a>'
+            + '<form action="daily_summary.pl" method="get"><input name="cams"><select name="date"></select></form>'
+            + '<table><tr><th>Parameter</th><th>00</th></tr><tr><td>Benzene</td><td>0.4</td></tr></table></body></html>',
+    });
+    const body = await (await get('/api/debug?source=probe&name=tceq_lynchburg')).json();
+    assert.equal(body.title, 'Lynchburg Ferry C1015');
+    assert.equal(body.links[0].text, 'AutoGC Hourly Averages');
+    assert.deepEqual(body.forms[0].fields, ['cams', 'date']);
+    assert.deepEqual(body.tables[0][1], ['Benzene', '0.4']);
+    assert.equal((await get('/api/debug?source=probe&name=nope')).status, 400);
+});

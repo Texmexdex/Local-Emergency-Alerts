@@ -6,7 +6,7 @@
 // GET /api/geocode?q=<address or place>
 //     Look up coordinates for a home address.
 // GET /api/health
-// GET /api/debug?source=caer|caer_app|houston|keymap   what an upstream feed returned
+// GET /api/debug?source=caer|caer_app|houston|keymap|probe   what an upstream feed returned
 //
 // The cron trigger (wrangler.toml) runs the ntfy phone-push monitor.
 import { SOURCES, assess } from './assess.js';
@@ -79,6 +79,19 @@ async function geocodeRoute(params) {
     return json({ query: q, results });
 }
 
+// Candidate replacement sources for industrial-incident awareness, inspected
+// with /api/debug?source=probe&name=<key> before parsers are written.
+const PROBES = {
+    tceq_lynchburg: 'https://www.tceq.texas.gov/cgi-bin/compliance/monops/daily_summary.pl?cams=1015',
+    tceq_channelview_wt: 'https://www.tceq.texas.gov/cgi-bin/compliance/monops/daily_summary.pl?cams=1036',
+    tceq_channelview: 'https://www.tceq.texas.gov/cgi-bin/compliance/monops/daily_summary.pl?cams=15',
+    tceq_amcv: 'https://www.tceq.texas.gov/cgi-bin/compliance/monops/agc_amcvs.pl',
+    tceq_eer: 'https://www2.tceq.texas.gov/oce/eer/index.cfm',
+    hcpcs_camp: 'https://pcs.harriscountytx.gov/Camp-dashboard',
+    news_abc13: 'https://abc13.com/feed/',
+    news_hpm: 'https://www.houstonpublicmedia.org/feed/',
+};
+
 // What an upstream feed actually returned, for checking parsers against live
 // data: /api/debug?source=caer | houston | keymap&code=494G
 async function debugRoute(params) {
@@ -134,6 +147,37 @@ async function debugRoute(params) {
                 html_head: page.html.slice(0, 2500),
             });
         }
+        if (source === 'probe') {
+            // Inspect a candidate data source before writing a parser for it.
+            const name = params.get('name');
+            const url = PROBES[name];
+            if (!url) return json({ error: 'unknown probe', names: Object.keys(PROBES) }, 400);
+            const page = await describe(url);
+            const html = page.html.slice(0, 400_000);
+            const base = new URL(page.url);
+            const abs = (u) => { try { return new URL(u, base).href; } catch { return null; } };
+            const linkRe = /<a\b[^>]*\bhref=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+            const links = [...html.matchAll(linkRe)]
+                .map((m) => ({ text: clean(htmlToText(m[2])).slice(0, 60), href: abs(m[1]) }))
+                .filter((l) => l.href && /cgi-bin|agc|summary|monops|eer|fuseaction|arcgis|rest\/services|feed|rss|json|api/i.test(l.href))
+                .slice(0, 40);
+            const forms = [...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/gi)].slice(0, 3).map((m) => ({
+                action: /action=["']([^"']*)["']/i.exec(m[1])?.[1] ?? null,
+                method: /method=["']([^"']*)["']/i.exec(m[1])?.[1] ?? 'get',
+                fields: [...m[2].matchAll(/<(?:input|select)\b[^>]*\bname=["']([^"']+)["'][^>]*>/gi)].map((f) => f[1]).slice(0, 30),
+            }));
+            const tables = [...html.matchAll(/<table\b[\s\S]*?<\/table>/gi)].slice(0, 4).map((t) =>
+                [...t[0].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].slice(0, 4).map((r) =>
+                    [...r[1].matchAll(/<t[dh]\b[^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((c) => clean(htmlToText(c[1])).slice(0, 40)).slice(0, 14)));
+            const isFeed = /^\s*<\?xml|<rss\b|<feed\b/i.test(html);
+            return json({
+                name, url: page.url, status: page.status, bytes: page.bytes, title: page.title,
+                feed_items: isFeed ? [...html.matchAll(/<(?:item|entry)\b[\s\S]*?<title[^>]*>([\s\S]*?)<\/title>/gi)].slice(0, 5)
+                    .map((m) => clean(htmlToText(m[1].replace(/<!\[CDATA\[|\]\]>/g, '')))) : undefined,
+                links, forms, tables,
+                text_sample: clean(htmlToText(html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, ''))).slice(0, 1200),
+            });
+        }
         if (source === 'houston') {
             const { html, ...meta } = await describe(houston.FEED_URL);
             const rows = houston.parseTable(html);
@@ -151,7 +195,7 @@ async function debugRoute(params) {
             const found = await keymap.queryService([code]);
             return json({ service: keymap.SERVICE_URL, code, result: found.get(code) || null });
         }
-        return json({ error: 'source must be caer, caer_app, houston or keymap' }, 400);
+        return json({ error: 'source must be caer, caer_app, houston, keymap or probe' }, 400);
     } catch (err) {
         return json({ source, error: `${err.name}: ${err.message}` }, 502);
     }

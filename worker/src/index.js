@@ -6,12 +6,16 @@
 // GET /api/geocode?q=<address or place>
 //     Look up coordinates for a home address.
 // GET /api/health
+// GET /api/debug?source=caer|houston|keymap   what an upstream feed returned
 //
 // The cron trigger (wrangler.toml) runs the ntfy phone-push monitor.
 import { SOURCES, assess } from './assess.js';
-import { DEFAULT_LABEL, DEFAULT_LAT, DEFAULT_LON, DEFAULT_RADIUS_KM } from './config.js';
+import * as caer from './caer.js';
+import { DEFAULT_LABEL, DEFAULT_LAT, DEFAULT_LON, DEFAULT_RADIUS_KM, USER_AGENT } from './config.js';
 import * as geocode from './geocode.js';
-import { TTLCache, getJson } from './http.js';
+import * as houston from './houston.js';
+import { TTLCache, clean, getJson, htmlToText } from './http.js';
+import * as keymap from './keymap.js';
 import { runMonitor } from './monitor.js';
 
 const CORS = {
@@ -75,6 +79,54 @@ async function geocodeRoute(params) {
     return json({ query: q, results });
 }
 
+// What an upstream feed actually returned, for checking parsers against live
+// data: /api/debug?source=caer | houston | keymap&code=494G
+async function debugRoute(params) {
+    const source = params.get('source');
+    const describe = async (url) => {
+        const resp = await fetch(url, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(15000) });
+        const html = await resp.text();
+        return {
+            url, status: resp.status, bytes: html.length,
+            title: clean(htmlToText(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] || '')) || null,
+            html,
+        };
+    };
+    try {
+        if (source === 'caer') {
+            const { html, ...meta } = await describe(caer.FEED_URL);
+            const postings = caer.parseFeed(html);
+            return json({
+                ...meta,
+                h5_headings: (html.match(/<h5\b/gi) || []).length,
+                parsed_postings: postings.length,
+                first_postings: postings.slice(0, 3).map((p) => ({ facility: p.facility, entries: p.entries.length, latest: p.entries[0] })),
+                text_sample: clean(htmlToText(html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, ''))).slice(0, 1500),
+            });
+        }
+        if (source === 'houston') {
+            const { html, ...meta } = await describe(houston.FEED_URL);
+            const rows = houston.parseTable(html);
+            return json({
+                ...meta,
+                header_found: /incident\s*type/i.test(html),
+                parsed_rows: rows.length,
+                sample_rows: rows.slice(0, 5),
+                key_map_codes: [...new Set(rows.map((r) => r.key_map).filter(Boolean))].slice(0, 20),
+            });
+        }
+        if (source === 'keymap') {
+            const code = keymap.normalizeCode(params.get('code') || '493A');
+            if (!code) return json({ error: 'code must look like 494G' }, 400);
+            const found = await keymap.queryService([code]);
+            return json({ service: keymap.SERVICE_URL, code, result: found.get(code) || null });
+        }
+        return json({ error: 'source must be caer, houston or keymap' }, 400);
+    } catch (err) {
+        return json({ source, error: `${err.name}: ${err.message}` }, 502);
+    }
+}
+
 export default {
     async fetch(request, env, ctx) {
         if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -85,6 +137,8 @@ export default {
                 return status(url.searchParams, env, ctx);
             case '/api/geocode':
                 return geocodeRoute(url.searchParams);
+            case '/api/debug':
+                return debugRoute(url.searchParams);
             case '/api/health':
                 return json({
                     status: 'ok',

@@ -73,3 +73,37 @@ test('time-only call times roll back a day', () => {
     assert.equal(iso('1:15 PM'), '2026-10-26T18:15:00.000Z');
     assert.equal(iso('garbage'), null);
 });
+
+test('live-format calls without house numbers are placed by Key Map square', async () => {
+    const { HOME, calls } = await import('./helpers.js');
+    mockFetch({ 'cohweb.houstontx.gov': () => fixture('houston_live.html') });
+    const incidents = await houston.fetchIncidents(...HOME, NOW);
+    const byType = Object.fromEntries(incidents.map((i) => [i.type, i]));
+    const hazmat = byType['HAZMAT - ODOR INVESTIGATION'];
+    assert.equal(hazmat.location_source, 'keymap');
+    assert.equal(hazmat.location_approximate, true);
+    assert.ok(Math.abs(hazmat.lat - 29.77) < 1e-9 && Math.abs(hazmat.lon + 95.13) < 1e-9);
+    assert.equal(hazmat.level, 'warning'); // ~1 mi away
+    assert.equal(byType['HOUSE ON FIRE'].kind, 'fire');
+    assert.equal(incidents.find((i) => i.address === 'KATY FWY IB').lat, null); // no Key Map code: unmapped, not guessed
+    assert.equal(calls.filter((c) => c.url.includes('addressbatch')).length, 0, 'no street numbers, so no address geocoding');
+    assert.equal(calls.filter((c) => c.url.includes('gis.hctx.net')).length, 1, 'one query for all squares');
+    houston.cache.clear();
+    await houston.fetchIncidents(...HOME, NOW);
+    assert.equal(calls.filter((c) => c.url.includes('gis.hctx.net')).length, 1, 'squares are cached');
+});
+
+test('Key Map service failure leaves calls unmapped and retries later', async () => {
+    const { HOME, calls } = await import('./helpers.js');
+    mockFetch({
+        'cohweb.houstontx.gov': () => fixture('houston_live.html'),
+        'gis.hctx.net': () => ({ error: { code: 400, message: 'Invalid field: KEYREF' } }),
+    });
+    const first = await houston.fetchIncidents(...HOME, NOW);
+    assert.ok(first.every((i) => i.lat === null));
+    mockFetch({ 'cohweb.houstontx.gov': () => fixture('houston_live.html') });
+    houston.cache.clear();
+    const second = await houston.fetchIncidents(...HOME, NOW);
+    assert.ok(second.some((i) => i.location_source === 'keymap'));
+    assert.ok(calls.filter((c) => c.url.includes('gis.hctx.net')).length >= 2);
+});

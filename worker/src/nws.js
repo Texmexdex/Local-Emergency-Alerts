@@ -90,12 +90,16 @@ function pointMeta(lat, lon) {
         return {
             forecastHourly: p.forecastHourly,
             place: [rel.city, rel.state].filter(Boolean).join(', '),
-            stations: stations.slice(0, 3).map((s) => ({
-                id: s.properties.stationIdentifier,
-                name: s.properties.name,
-                lat: s.geometry.coordinates[1],
-                lon: s.geometry.coordinates[0],
-            })),
+            // NWS doesn't promise distance order, so pick the nearest three ourselves.
+            stations: stations
+                .map((s) => ({
+                    id: s.properties.stationIdentifier,
+                    name: s.properties.name,
+                    lat: s.geometry.coordinates[1],
+                    lon: s.geometry.coordinates[0],
+                }))
+                .sort((a, b) => distanceKm(lat, lon, a.lat, a.lon) - distanceKm(lat, lon, b.lat, b.lon))
+                .slice(0, 3),
         };
     });
 }

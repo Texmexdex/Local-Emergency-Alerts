@@ -204,11 +204,13 @@ function drawMap(status) {
         if (f.lat == null) continue;
         const color = levelColor(f.level);
         const m = L.circleMarker([f.lat, f.lon], {
-            radius: f.level === 'info' ? 5 : 8, color, weight: 2, fillColor: color, fillOpacity: 0.7,
+            radius: f.level === 'info' ? 5 : 8, color, weight: 2, fillColor: color,
+            fillOpacity: f.location_approximate ? 0.15 : 0.7,
         }).bindPopup(popupFor(`Houston Fire: ${f.type}`, [
             [f.address, f.cross_street].filter(Boolean).join(' & '),
             when(f.called_at),
             f.distance_km != null ? `${kmToMi(f.distance_km)} mi ${f.bearing_from_home || ''} of you` : null,
+            f.location_source === 'keymap' ? `Approximate: centre of Key Map square ${f.key_map} (about ¾ mile across)` : null,
         ])).addTo(fireLayer);
         markerById[f.id] = m;
     }
@@ -562,7 +564,7 @@ function renderFire(s) {
         el('p', { class: 'item-meta' },
             el('span', { text: [f.address, f.cross_street].filter(Boolean).join(' & ') || 'No address' }),
             el('span', { text: f.called_at ? when(f.called_at) : f.call_time_raw || '' }),
-            el('span', { text: f.distance_km != null ? `${kmToMi(f.distance_km)} mi ${f.bearing_from_home || ''}` : 'not mapped' }),
+            el('span', { text: f.distance_km != null ? `${kmToMi(f.distance_km)} mi ${f.bearing_from_home || ''}${f.location_approximate ? ' (approx.)' : ''}` : 'not mapped' }),
             f.alarm ? el('span', { text: `Alarm ${f.alarm}` }) : null),
     )));
 }

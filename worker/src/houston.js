@@ -5,6 +5,7 @@
 // unincorporated Harris County such as Channelview or Sheldon is NOT covered.)
 import { bearingDeg, compass, distanceKm, round1 } from './geo.js';
 import * as geocode from './geocode.js';
+import * as keymap from './keymap.js';
 import { TTLCache, clean, getText, htmlToText, localParts, localToEpoch, toLocalIso } from './http.js';
 
 export const FEED_URL = 'https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx';
@@ -121,9 +122,14 @@ async function idFor(key) {
 export async function fetchIncidents(homeLat, homeLon, now = Date.now()) {
     const rows = await cache.getOrFetch('feed', async () => parseTable(await getText(FEED_URL)));
     const fireRows = rows.filter((r) => !r.agency || r.agency.toUpperCase().startsWith('F'));
-    const locations = await geocode.geocodeStreets(fireRows.map((r) => r.address).filter(Boolean), { city: 'Houston', state: 'TX' });
+    // The live feed usually omits house numbers ("AUGUSTA DR" @ "BURGOYNE RD"),
+    // so most calls are placed at the centre of their Key Map square instead.
+    const [streets, squares] = await Promise.all([
+        geocode.geocodeStreets(fireRows.map((r) => r.address).filter((a) => /\d/.test(a || '')), { city: 'Houston', state: 'TX' }),
+        keymap.lookup(fireRows.map((r) => r.key_map)),
+    ]);
     const incidents = await Promise.all(fireRows.map(async (r) => {
-        const loc = r.address ? locations.get(r.address) : null;
+        const loc = (r.address && streets.get(r.address)) || squares.get(keymap.normalizeCode(r.key_map)) || null;
         const dist = loc ? round1(distanceKm(homeLat, homeLon, loc.lat, loc.lon)) : null;
         const [level, kind] = classify(r, dist);
         const called = parseCallTime(r.call_time, now);
@@ -141,6 +147,8 @@ export async function fetchIncidents(homeLat, homeLon, now = Date.now()) {
             kind,
             lat: loc ? loc.lat : null,
             lon: loc ? loc.lon : null,
+            location_approximate: Boolean(loc?.approximate),
+            location_source: loc ? (loc.approximate ? 'keymap' : 'address') : null,
             distance_km: dist,
             bearing_from_home: loc ? compass(bearingDeg(homeLat, homeLon, loc.lat, loc.lon)) : null,
             url: FEED_URL,

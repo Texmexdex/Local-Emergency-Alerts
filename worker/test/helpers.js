@@ -4,6 +4,7 @@ import { afterEach, beforeEach } from 'node:test';
 import * as caer from '../src/caer.js';
 import * as geocode from '../src/geocode.js';
 import * as houston from '../src/houston.js';
+import * as keymap from '../src/keymap.js';
 import * as nws from '../src/nws.js';
 
 export const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -11,6 +12,15 @@ export const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, impo
 // 1:30 PM Houston time (CDT, UTC-5) on the fixture day.
 export const NOW = Date.parse('2026-10-26T13:30:00-05:00');
 export const HOME = [29.7761, -95.1144]; // Channelview
+
+// Fake Key Map squares (centre points) for the Harris County GIS mock.
+// Values are illustrative test coordinates, not the real grid.
+export const KEYMAP = {
+    '494G': [29.7745, -95.3375],
+    '491P': [29.7600, -95.5100],
+    '455H': [29.7950, -95.2950],
+    '458U': [29.7700, -95.1300], // ~1 mi west of HOME
+};
 
 // Fake geocoder results keyed by normalized upper-case address.
 export const GEOCODES = {
@@ -51,6 +61,15 @@ export function mockFetch(routes = {}) {
             });
             return new Response(lines.join('\n'));
         }
+        if (url.includes('gis.hctx.net') && !routes['gis.hctx.net']) {
+            const where = new URL(url).searchParams.get('where');
+            const codes = [...where.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+            const d = 0.005; // half a square, in degrees
+            return Response.json({ features: codes.filter((c) => KEYMAP[c]).map((c) => {
+                const [lat, lon] = KEYMAP[c];
+                return { attributes: { KEYREF: c }, geometry: { rings: [[[lon - d, lat - d], [lon + d, lat - d], [lon + d, lat + d], [lon - d, lat + d], [lon - d, lat - d]]] } };
+            }) });
+        }
         for (const [needle, handler] of Object.entries(routes)) {
             if (url.includes(needle)) {
                 const out = typeof handler === 'function' ? await handler(url, init) : handler;
@@ -66,6 +85,7 @@ export function resetAll() {
     for (const c of [caer.cache, houston.cache, ...Object.values(nws.caches)]) c.clear();
     caer._reset();
     geocode._reset();
+    keymap._reset();
     calls.length = 0;
 }
 

@@ -54,8 +54,10 @@ test('weather uses the nearest station with a fresh reading', async () => {
     mockFetch({
         '/points/': { properties: { observationStations: 'https://api.weather.gov/gridpoints/HGX/1,1/stations', forecastHourly: 'x', relativeLocation: { properties: { city: 'Channelview', state: 'TX' } } } },
         '/stations/KSTALE/': { properties: { timestamp: '2026-10-25T00:00:00Z', windSpeed: { value: 10 }, windDirection: { value: 90 } } },
+        '/stations/KFAR/': { properties: { timestamp: obsAt, windSpeed: { value: 30 }, windDirection: { value: 0 } } },
         '/stations/KHPY/': { properties: { timestamp: obsAt, windSpeed: { value: 16.09 }, windDirection: { value: 180 }, temperature: { value: 25 }, relativeHumidity: { value: 70.4 }, textDescription: 'Cloudy' } },
         '/stations': { features: [
+            { properties: { stationIdentifier: 'KFAR', name: 'Far away' }, geometry: { coordinates: [-95.9, 30.3] } },
             { properties: { stationIdentifier: 'KSTALE', name: 'Stale' }, geometry: { coordinates: [-95.1, 29.8] } },
             { properties: { stationIdentifier: 'KHPY', name: 'Baytown' }, geometry: { coordinates: [-94.95, 29.78] } },
         ] },

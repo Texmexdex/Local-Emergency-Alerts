@@ -444,6 +444,12 @@ function renderStatus(s) {
     notice.replaceChildren();
     if (s.pending) {
         notice.append('Showing official NWS alerts while the industrial and fire feeds finish loading.');
+    } else if (!API_BASE) {
+        notice.append(
+            el('strong', { text: 'Industrial and fire feeds are not connected yet. ' }),
+            'Official NWS alerts and wind are shown. To add CAER and Houston Fire data, set the data server URL (apiBase) in config.js. ',
+            ...['caer', 'houston_fire'].flatMap((k, i) => [i ? ' · ' : '', el('a', { href: SOURCE_LINKS[k], target: '_blank', rel: 'noopener', text: SOURCE_NAMES[k] })]),
+        );
     } else if (!s.complete && s.failed_sources?.length) {
         notice.append(
             el('strong', { text: 'This may not be the full picture. ' }),

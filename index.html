@@ -4,190 +4,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Industrial Safety Monitor</title>
+    <title>Local Emergency Alerts</title>
+    <meta name="description" content="Is there an emergency near me? Official NWS alerts, industrial (CAER) notifications, Houston Fire incidents and wind, for the Houston Ship Channel area.">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-left">
-                <h1>INDUSTRIAL SAFETY MONITOR</h1>
-                <div class="status-bar">
-                    <span class="status-item" id="system-status">SYSTEM: OPERATIONAL</span>
-                    <span class="status-item" id="last-update">LAST UPDATE: --:--:--</span>
+    <header class="topbar">
+        <div class="brand">
+            <h1>Local Emergency Alerts</h1>
+            <button class="location-btn" id="location-btn" type="button" title="Change location">
+                <span aria-hidden="true">📍</span> <span id="location-label">Channelview, TX</span> <span class="edit">Change</span>
+            </button>
+        </div>
+        <div class="topbar-actions">
+            <span class="checked" id="checked-at" aria-live="polite">Checking…</span>
+            <button class="btn" id="refresh-btn" type="button">Refresh</button>
+        </div>
+    </header>
+
+    <main class="page">
+        <!-- The answer -->
+        <section class="status status-loading" id="status" aria-live="assertive">
+            <div class="status-head">
+                <div class="status-icon" id="status-icon" aria-hidden="true">…</div>
+                <div>
+                    <h2 class="status-headline" id="status-headline">Checking for emergencies near you…</h2>
+                    <p class="status-sub" id="status-sub"></p>
                 </div>
             </div>
-            <div class="header-right">
-                <button class="btn-refresh" id="refresh-btn">REFRESH DATA</button>
-            </div>
-        </header>
+            <div class="status-notice" id="status-notice" hidden></div>
+            <ol class="reasons" id="reasons"></ol>
+            <div class="guidance" id="guidance" hidden></div>
+        </section>
 
-        <!-- Main Grid -->
-        <div class="main-grid">
-            <!-- Left Column: Wind, Radio, Weather & TCEQ -->
-            <div class="left-column">
-                <!-- Wind Conditions -->
-                <section class="panel wind-panel">
-                    <h2 class="panel-title">METEOROLOGICAL CONDITIONS</h2>
-                    <div class="wind-data">
-                        <div class="wind-metric">
-                            <span class="metric-label">WIND DIRECTION</span>
-                            <span class="metric-value" id="wind-direction">---</span>
-                        </div>
-                        <div class="wind-metric">
-                            <span class="metric-label">WIND SPEED</span>
-                            <span class="metric-value" id="wind-speed">-- MPH</span>
-                        </div>
-                        <div class="wind-metric">
-                            <span class="metric-label">TEMPERATURE</span>
-                            <span class="metric-value" id="temperature">-- °F</span>
-                        </div>
-                    </div>
-                    <div class="wind-alert" id="wind-alert"></div>
-                    <div class="plume-controls">
-                        <label class="plume-toggle">
-                            <input type="checkbox" id="show-plumes">
-                            SHOW DISPERSION PLUMES (BETA)
-                        </label>
-                    </div>
-                </section>
+        <section class="controls" aria-label="Alert settings">
+            <label>Radius
+                <select id="radius-select">
+                    <option value="3">3 mi</option>
+                    <option value="5">5 mi</option>
+                    <option value="10" selected>10 mi</option>
+                    <option value="15">15 mi</option>
+                    <option value="25">25 mi</option>
+                </select>
+            </label>
+            <label class="switch"><input type="checkbox" id="notify-toggle"> Browser notifications</label>
+            <label class="switch"><input type="checkbox" id="sound-toggle"> Alarm sound</label>
+            <label>Notify for
+                <select id="min-level-select">
+                    <option value="action">Take-action only</option>
+                    <option value="warning" selected>Warnings &amp; up</option>
+                    <option value="advisory">Advisories &amp; up</option>
+                </select>
+            </label>
+        </section>
 
-                <!-- Radio Scanner -->
-                <section class="panel radio-panel">
-                    <h2 class="panel-title">📻 RADIO SCANNER</h2>
-                    <div class="radio-controls">
-                        <select id="radio-channel" class="radio-select">
-                            <option value="">-- SELECT CHANNEL --</option>
-                        </select>
-                        <label class="auto-switch-label">
-                            <input type="checkbox" id="auto-switch" checked>
-                            AUTO-LINK
-                        </label>
+        <div class="layout">
+            <section class="card map-card">
+                <div class="card-head">
+                    <h3>Map</h3>
+                    <div class="legend">
+                        <span><i class="dot home"></i>You</span>
+                        <span><i class="dot lvl-action"></i>Act now</span>
+                        <span><i class="dot lvl-warning"></i>Warning</span>
+                        <span><i class="dot lvl-advisory"></i>Advisory</span>
+                        <span><i class="dot lvl-info"></i>Routine</span>
+                        <span><i class="cone"></i>Downwind</span>
                     </div>
-                    <div class="radio-info">
-                        <span id="radio-status">No channel selected</span>
+                </div>
+                <div id="map" role="region" aria-label="Map of incidents near you">
+                    <div class="wind-badge" id="wind-badge" hidden>
+                        <svg id="wind-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 5 20l7-4 7 4z" /></svg>
+                        <span id="wind-badge-text"></span>
                     </div>
-                    <div class="radio-player" id="radio-player">
-                        <div class="radio-placeholder">
-                            Select a channel or click an incident to listen
-                        </div>
-                    </div>
-                </section>
+                </div>
+                <p class="fineprint">Industrial sites are placed from the address in their own CAER message; hollow markers are approximate. Fire incidents are geocoded from the dispatch address. Calls that could not be geocoded are listed but not mapped.</p>
+            </section>
 
-                <!-- NWS Weather Alerts -->
-                <section class="panel weather-panel">
-                    <h2 class="panel-title">⚡ NWS WEATHER ALERTS</h2>
-                    <div class="alert-count">
-                        <span id="weather-count">0 ACTIVE ALERTS</span>
-                    </div>
-                    <div class="weather-alerts" id="weather-alerts">
-                        <div class="loading">LOADING WEATHER ALERTS...</div>
-                    </div>
-                </section>
+            <section class="card" id="conditions-card">
+                <div class="card-head"><h3>Wind &amp; air</h3></div>
+                <div class="conditions" id="conditions"><p class="muted">Loading…</p></div>
+            </section>
 
-                <!-- TCEQ Emissions -->
-                <section class="panel tceq-panel">
-                    <h2 class="panel-title">🏭 TCEQ EMISSION EVENTS</h2>
-                    <div class="alert-count">
-                        <span id="tceq-count">0 EVENTS</span>
-                    </div>
-                    <div class="tceq-events" id="tceq-events">
-                        <div class="loading">LOADING TCEQ DATA...</div>
-                    </div>
-                </section>
-            </div>
+            <section class="card" id="nws-card">
+                <div class="card-head">
+                    <h3>Official alerts <small>National Weather Service &amp; local officials</small></h3>
+                    <span class="count" id="nws-count"></span>
+                </div>
+                <div class="list" id="nws-list"><p class="muted">Loading…</p></div>
+            </section>
 
-            <!-- Center Column: Map -->
-            <div class="center-column">
-                <section class="panel map-panel">
-                    <h2 class="panel-title">FACILITY LOCATIONS</h2>
-                    <div class="map-legend">
-                        <div class="legend-item">
-                            <span class="legend-marker facility"></span>
-                            <span>INDUSTRIAL FACILITY</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-marker incident"></span>
-                            <span>ACTIVE INCIDENT</span>
-                        </div>
-                    </div>
-                    <div id="map">
-                        <!-- Wind Direction Overlay -->
-                        <div class="wind-overlay" id="wind-overlay">
-                            <span class="wind-overlay-title">WIND</span>
-                            <div class="wind-arrow-container">
-                                <div class="wind-arrow" id="wind-arrow">
-                                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M12 2L2 22l10-4 10 4L12 2z" />
-                                    </svg>
-                                </div>
-                            </div>
-                            <span class="wind-speed-label" id="wind-speed-overlay">-- MPH</span>
-                            <span class="wind-direction-label" id="wind-dir-overlay">---</span>
-                        </div>
-                    </div>
-                </section>
-            </div>
+            <section class="card" id="caer-card">
+                <div class="card-head">
+                    <h3>Industrial notifications <small>CAER / plant community alerts</small></h3>
+                    <span class="count" id="caer-count"></span>
+                </div>
+                <label class="switch small"><input type="checkbox" id="show-routine"> Show drills, all-clears &amp; routine notices</label>
+                <div class="list" id="caer-list"><p class="muted">Loading…</p></div>
+            </section>
 
-            <!-- Right Column: Alerts & Dispatch -->
-            <div class="right-column">
-                <!-- CAER Alerts -->
-                <section class="panel caer-panel">
-                    <h2 class="panel-title">COMMUNITY ALERT SYSTEM (CAER)</h2>
-                    <div class="caer-count">
-                        <span id="caer-count">0 ACTIVE MESSAGES</span>
-                    </div>
-                    <div class="caer-messages" id="caer-messages">
-                        <div class="loading">LOADING CAER DATA...</div>
-                    </div>
-                </section>
+            <section class="card" id="fire-card">
+                <div class="card-head">
+                    <h3>Fire &amp; hazmat calls <small>City of Houston Fire/EMS</small></h3>
+                    <span class="count" id="fire-count"></span>
+                </div>
+                <label class="switch small"><input type="checkbox" id="show-all-fire"> Show all active calls citywide</label>
+                <div class="list" id="fire-list"><p class="muted">Loading…</p></div>
+                <p class="fineprint">Covers the City of Houston only. Unincorporated Harris County (Channelview, Sheldon, Crosby, etc.) and other cities are not included in this feed.</p>
+            </section>
 
-                <!-- Emergency Dispatch -->
-                <section class="panel dispatch-panel">
-                    <h2 class="panel-title">EMERGENCY DISPATCH LOG</h2>
-                    <div class="dispatch-header">
-                        <span id="dispatch-count">0 PRIORITY INCIDENTS</span>
-                        <span class="click-hint">Click row to tune radio</span>
-                    </div>
-                    <div class="sort-controls">
-                        <button class="sort-btn active" id="sort-time" data-sort="time">TIME</button>
-                        <button class="sort-btn" id="sort-type" data-sort="type">TYPE</button>
-                        <button class="sort-btn" id="sort-location" data-sort="location">LOCATION</button>
-                        <label style="font-size: 10px; color: var(--text-dim); margin-left: auto;">
-                            <input type="checkbox" id="show-all-incidents" style="margin-right: 5px;">ALL
-                        </label>
-                        <label style="font-size: 10px; color: var(--text-dim);">
-                            <input type="checkbox" id="show-all" style="margin-right: 5px;">HISTORY
-                        </label>
-                    </div>
-                    <div class="dispatch-table-container">
-                        <table class="dispatch-table" id="dispatch-table">
-                            <thead>
-                                <tr>
-                                    <th>TIME</th>
-                                    <th>AGENCY</th>
-                                    <th>TYPE</th>
-                                    <th>LOCATION</th>
-                                </tr>
-                            </thead>
-                            <tbody id="dispatch-tbody">
-                                <tr>
-                                    <td colspan="4" class="loading">LOADING DISPATCH DATA...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-            </div>
+            <section class="card resources">
+                <div class="card-head"><h3>Get official alerts on your phone</h3></div>
+                <ul>
+                    <li><a href="https://www.readyharris.org/" target="_blank" rel="noopener">Ready Harris Alerts</a>: Harris County's official text/call/email alerts, including shelter-in-place orders. Sign up for your home address.</li>
+                    <li><strong>Wireless Emergency Alerts</strong>: make sure emergency/public-safety alerts are turned on in your phone's notification settings.</li>
+                    <li><strong>Phone push from this tool</strong>: install the <a href="https://ntfy.sh/" target="_blank" rel="noopener">ntfy</a> app and subscribe to the topic configured in this project's monitor (see the README).</li>
+                </ul>
+                <div class="card-head"><h3>Primary sources</h3></div>
+                <ul>
+                    <li><a href="https://www.incident-reporter.net/e-notifycaerfeed/caermessagelive.html" target="_blank" rel="noopener">CAER live message postings</a></li>
+                    <li><a href="https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx" target="_blank" rel="noopener">City of Houston active incidents</a></li>
+                    <li><a href="https://www.weather.gov/hgx/" target="_blank" rel="noopener">NWS Houston/Galveston</a></li>
+                    <li><a href="https://www.airnow.gov/" target="_blank" rel="noopener">AirNow (official air quality)</a></li>
+                    <li><a href="https://www.broadcastify.com/listen/ctid/2623" target="_blank" rel="noopener">Harris County scanner feeds (Broadcastify)</a></li>
+                </ul>
+            </section>
         </div>
-    </div>
+    </main>
 
     <footer class="footer">
-        <span>TeXmExDeX Type Tools</span>
+        <p><strong>Not an official warning system.</strong> Feeds can be delayed, incomplete or offline. In an emergency call 911 and follow instructions from local officials.</p>
+        <p>TeXmExDeX Type Tools</p>
     </footer>
+
+    <dialog id="location-dialog">
+        <form method="dialog" id="location-form">
+            <h2>Your location</h2>
+            <p class="muted">Distances, the radius and downwind checks are measured from here. Saved only in this browser.</p>
+            <label for="location-input">Street address or place</label>
+            <div class="row">
+                <input id="location-input" type="text" placeholder="e.g. 16000 Market St, Channelview, TX" autocomplete="street-address">
+                <button class="btn" id="location-search" type="button">Search</button>
+            </div>
+            <ul class="geo-results" id="geo-results"></ul>
+            <button class="btn secondary" id="use-gps" type="button">Use my current location</button>
+            <p class="error" id="location-error" hidden></p>
+            <div class="row end">
+                <button class="btn secondary" value="cancel">Close</button>
+            </div>
+        </form>
+    </dialog>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="app.js"></script>

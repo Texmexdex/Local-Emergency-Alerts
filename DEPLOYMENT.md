@@ -1,175 +1,58 @@
-# Deployment Guide
+# Deployment
 
-Complete guide for deploying the Industrial Safety Monitor with GitHub Pages frontend and Hugging Face Spaces backend.
+Two free pieces:
 
-## Architecture
+- **Frontend**: GitHub Pages serving `index.html`, `app.js` and `style.css` from the repository root.
+- **Backend**: a Hugging Face Docker Space built from the `api/` folder.
 
-- **Frontend**: Static HTML/CSS/JS hosted on GitHub Pages
-- **Backend**: Flask API hosted on Hugging Face Spaces
-- **Communication**: Frontend fetches JSON data from backend API via CORS
+## Backend (Hugging Face Space)
 
----
+The Space already exists at `https://huggingface.co/spaces/Texmexdex/Local-Emergency-Alerts` and serves `https://texmexdex-local-emergency-alerts.hf.space`.
 
-## Part 1: Deploy Backend to Hugging Face Spaces
+### Automatic (recommended)
 
-### Step 1: Create a Hugging Face Account
-1. Go to https://huggingface.co/join
-2. Create a free account
+`.github/workflows/deploy-backend.yml` runs the tests and then pushes `api/` to the Space whenever `api/**` changes on `main`.
 
-### Step 2: Create a New Space
-1. Click "New Space" from your profile
-2. Configure:
-   - **Space name**: `industrial-monitor-api` (or your choice)
-   - **License**: MIT
-   - **SDK**: Docker
-   - **Visibility**: Public (required for free tier)
+1. Create a Hugging Face **write** token: huggingface.co → Settings → Access Tokens.
+2. Add it to GitHub as repository secret `HF_TOKEN` (Settings → Secrets and variables → Actions).
+3. If your Space has a different name, add repository variable `HF_SPACE` (e.g. `your-name/your-space`).
+4. Push to `main`, or run *Deploy backend to Hugging Face* from the Actions tab.
 
-### Step 3: Upload Backend Files
-Upload these files from the `api/` folder to your Space:
-- `app.py`
-- `requirements.txt`
-- `Dockerfile`
-- `README.md`
+The workflow force-pushes the contents of `api/` as the Space's `main` branch, so the GitHub repo is the source of truth.
 
-You can either:
-- Use the web interface to upload files
-- Clone the Space repo and push via git:
-  ```bash
-  git clone https://huggingface.co/spaces/YOUR-USERNAME/industrial-monitor-api
-  cd industrial-monitor-api
-  # Copy files from api/ folder
-  git add .
-  git commit -m "Initial backend deployment"
-  git push
-  ```
+### Manual
 
-### Step 4: Wait for Build
-- HF Spaces will automatically build your Docker container
-- This takes 2-5 minutes
-- Check the "Logs" tab for build progress
-
-### Step 5: Test Your API
-Once deployed, your API will be at:
-```
-https://YOUR-USERNAME-industrial-monitor-api.hf.space
-```
-
-Test endpoints:
-- https://YOUR-USERNAME-industrial-monitor-api.hf.space/api/health
-- https://YOUR-USERNAME-industrial-monitor-api.hf.space/api/wind
-- https://YOUR-USERNAME-industrial-monitor-api.hf.space/api/caer
-
----
-
-## Part 2: Deploy Frontend to GitHub Pages
-
-### Step 1: Update API URL
-Edit `docs/app.js` and replace the API_BASE_URL:
-
-```javascript
-const API_BASE_URL = 'https://YOUR-USERNAME-industrial-monitor-api.hf.space/api';
-```
-
-### Step 2: Push to GitHub
 ```bash
-git add .
-git commit -m "Deploy industrial monitor"
-git push origin main
+git clone https://huggingface.co/spaces/Texmexdex/Local-Emergency-Alerts hf-space
+cp -r api/* hf-space/            # app.py, emergency/, Dockerfile, requirements.txt, README.md
+cd hf-space && git add -A && git commit -m "Update backend" && git push
 ```
 
-### Step 3: Enable GitHub Pages
-1. Go to your repository on GitHub
-2. Click "Settings" → "Pages"
-3. Under "Source", select:
-   - Branch: `main`
-   - Folder: `/docs`
-4. Click "Save"
+`api/README.md` contains the Space's configuration header (`sdk: docker`, `app_port: 7860`). Keep it.
 
-### Step 4: Access Your Site
-After 1-2 minutes, your dashboard will be live at:
-```
-https://YOUR-USERNAME.github.io/YOUR-REPO-NAME/
-```
+Check it after the build finishes (2–5 min):
 
----
+- `https://texmexdex-local-emergency-alerts.hf.space/api/health`
+- `https://texmexdex-local-emergency-alerts.hf.space/api/status`
 
-## Testing
+The `sources` block in `/api/status` shows whether each upstream feed responded and, if not, the error.
 
-1. Open your GitHub Pages URL
-2. Verify all panels load data:
-   - Wind conditions should show direction/speed
-   - CAER messages should populate
-   - Dispatch log should show incidents
-   - Map should display facility markers
+## Frontend (GitHub Pages)
 
-3. Check browser console (F12) for any errors
+1. GitHub → Settings → Pages → Source: *Deploy from a branch*, Branch `main`, folder `/ (root)`.
+2. The site appears at `https://texmexdex.github.io/Local-Emergency-Alerts/`.
 
----
+The API URL is set at the top of `app.js` (`API_BASE`). If you move the backend, change it there, or test without editing using `?api=https://your-backend/api`.
+
+## Phone push (optional)
+
+See [README → Phone alerts](README.md#phone-alerts-ntfy). Requires only the `NTFY_TOPIC` secret.
 
 ## Troubleshooting
 
-### Backend Issues
-
-**Build fails on HF Spaces:**
-- Check Logs tab for error messages
-- Verify Dockerfile syntax
-- Ensure all dependencies in requirements.txt are valid
-
-**API returns 500 errors:**
-- Check Space logs for Python errors
-- Test individual endpoints
-- Verify external APIs (NWS, CAER, dispatch) are accessible
-
-**CORS errors:**
-- Ensure flask-cors is installed
-- Verify CORS(app) is called in app.py
-
-### Frontend Issues
-
-**"OFFLINE" or "UNAVAILABLE" messages:**
-- Verify API_BASE_URL is correct in app.js
-- Check browser console for fetch errors
-- Test API endpoints directly in browser
-
-**Map not loading:**
-- Check browser console for Leaflet errors
-- Verify internet connection (Leaflet tiles load from CDN)
-
-**Data not refreshing:**
-- Check browser console for JavaScript errors
-- Verify auto-refresh interval is set
-
----
-
-## Maintenance
-
-### Update Backend
-1. Edit files in `api/` folder
-2. Push to HF Spaces repo
-3. Space will automatically rebuild
-
-### Update Frontend
-1. Edit files in `docs/` folder
-2. Push to GitHub
-3. GitHub Pages will automatically redeploy
-
-### Monitor Usage
-- HF Spaces free tier: Check usage in Space settings
-- GitHub Pages: Unlimited bandwidth for public repos
-
----
-
-## Cost
-
-Both services are **completely free** for public projects:
-- Hugging Face Spaces: Free tier with Docker support
-- GitHub Pages: Free for public repositories
-
----
-
-## Security Notes
-
-- No API keys required (all data sources are public)
-- Backend uses read-only web scraping
-- No user data collected or stored
-- All traffic over HTTPS
+| Symptom | Check |
+|---|---|
+| Page says "Showing official NWS alerts while the industrial and fire feeds load" for a long time | The Space is waking up or failed to build. Open the Space's *Logs* tab |
+| "Couldn't reach: CAER …" | The CAER site may be down or blocking the Space. Error text is in `/api/status` → `sources.caer.error` |
+| Fire calls listed as "not mapped" | The Census geocoder couldn't match that dispatch address; it is still listed, just not placed on the map |
+| Scheduled monitor stopped | GitHub disables scheduled workflows after 60 days of no repository activity. Re-enable it in the Actions tab |

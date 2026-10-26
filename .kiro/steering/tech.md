@@ -1,51 +1,19 @@
 # Technology Stack
 
-## Framework
+- **Frontend**: plain HTML/CSS/JS (no build step), Leaflet 1.9.4 from unpkg, CARTO basemap tiles
+- **Backend**: Python 3.12, Flask, flask-cors, requests, BeautifulSoup, gunicorn (1 worker, 8 threads so caches are shared), tzdata
+- **Hosting**: GitHub Pages (frontend), Hugging Face Docker Space on port 7860 (backend)
+- **Notifications**: Web Notifications API + WebAudio in the browser; ntfy.sh via GitHub Actions
 
-- **Streamlit**: Web application framework for Python dashboards
-- **Python 3.x**: Primary language
-
-## Key Libraries
-
-- `streamlit`: UI framework and page configuration
-- `requests`: HTTP client for API calls and web scraping
-- `beautifulsoup4` + `lxml`: HTML parsing for CAER and dispatch feeds
-- `pandas`: Data manipulation and tabular display
-- `openpyxl`: Excel file support (dependency)
-
-## Environment Setup
-
-The project uses a Python virtual environment (`venv/`) for dependency isolation.
-
-### Setup Commands
+## Commands
 
 ```bash
-# Initial setup (creates venv and installs dependencies)
-setup.bat
-
-# Or manually:
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
+cd api
+pip install -r requirements.txt pytest
+pytest -q                               # tests
+python app.py                           # API at http://127.0.0.1:7860
+python -m emergency.monitor --dry-run   # preview phone notifications
+python -m http.server 8000              # (from repo root) serve the frontend
 ```
 
-### Running the Application
-
-```bash
-# Launch dashboard (auto-creates venv if missing)
-run.bat
-
-# Or manually:
-venv\Scripts\activate
-streamlit run App.py
-```
-
-The dashboard runs on `http://localhost:8501` by default.
-
-## External APIs
-
-- **NWS API**: `api.weather.gov` - No authentication required, uses grid-based forecasts
-- **CAER Feed**: Web scraping with BeautifulSoup
-- **Houston Dispatch**: Web scraping with pandas HTML parser
-
-All HTTP requests use custom User-Agent headers to avoid blocking.
+All upstream sources are public and need no API keys. NWS requires a descriptive User-Agent (set in `emergency/config.py`).

@@ -1,48 +1,31 @@
 # Project Structure
 
-## Root Files
+## Frontend (repo root, GitHub Pages)
 
-- `App.py`: Main dashboard application (primary entry point)
-- `Dashboard.py`: Alternative/unabridged dashboard view
-- `requirements.txt`: Python dependencies
-- `setup.bat`: Initial environment setup script
-- `run.bat`: Launch script with auto-setup
-- `venv/`: Python virtual environment (gitignored)
+- `index.html`: page layout (status banner, map, source cards, location dialog)
+- `app.js`: fetches `/api/status`, NWS-direct fallback, rendering, Leaflet map, notifications, location settings (localStorage)
+- `style.css`: design tokens with light/dark themes; level colors `--action/--warning/--advisory/--clear/--info`
 
-## Code Organization
+## Backend (`api/`, Hugging Face Docker Space)
 
-### App.py (Main Dashboard)
+- `app.py`: Flask routes `/api/status`, `/api/geocode`, `/api/health`
+- `emergency/config.py`: defaults (home location, radius, User-Agent, timezone)
+- `emergency/http.py`: shared requests session + `TTLCache`
+- `emergency/geo.py`: distance, bearing, compass, downwind exposure
+- `emergency/geocode.py`: Census geocoder with caching; `KNOWN_SITES` approximate fallbacks
+- `emergency/nws.py`, `caer.py`, `houston.py`: one module per source: fetch, parse, normalize, classify
+- `emergency/assess.py`: combines sources into level + reasons
+- `emergency/monitor.py`: ntfy notifier CLI (`python -m emergency.monitor`)
+- `tests/`: pytest suite with HTML fixtures; no network access
 
-- **Configuration**: Page config, location coordinates, HTTP headers
-- **Data engines**: Cached functions for fetching wind, CAER, and dispatch data
-- **UI layout**: Sidebar + 3-tab interface (Dispatch, CAER, Map)
+## Automation (`.github/workflows/`)
 
-### Dashboard.py (Alternative View)
+- `tests.yml`: pytest on every push/PR
+- `deploy-backend.yml`: pushes `api/` to the HF Space (needs `HF_TOKEN`)
+- `monitor.yml`: every 10 min, ntfy push (needs `NTFY_TOPIC`)
 
-- Similar structure but with unabridged CAER feed display
-- 2-column layout instead of tabs
+## Patterns
 
-## Key Patterns
-
-### Data Fetching
-
-All data fetching functions follow error-handling patterns:
-- Try/except blocks with fallback values
-- Timeout parameters on HTTP requests
-- Graceful degradation when APIs fail
-
-### Caching
-
-Wind data uses `@st.cache_data(ttl=60)` for 60-second cache to reduce API calls.
-
-### Filtering Logic
-
-- **Dispatch logs**: Keyword-based filtering (SHELDON, BAYWAY, CHANNELVIEW, FIRE, HAZMAT, etc.)
-- **CAER messages**: Severity-based color coding (error/warning/info)
-- **Wind risk**: Direction-based assessment (N/E winds = risk)
-
-## Constants
-
-- `LOCATIONS`: Dictionary of facility coordinates for mapping
-- `HEADERS`: User-Agent string for web scraping
-- Keywords for filtering are hardcoded strings in filter logic
+- Each source fails independently; `assess.gather` records `ok/error` per source.
+- Classification is rule-based (regexes in `caer.py`, `houston.py`, `nws.ACTION_EVENTS`). Add a fixture + test for any new rule.
+- `app.js` `NWS_ACTION_EVENTS` mirrors `nws.ACTION_EVENTS`. Keep them in sync.

@@ -1,31 +1,6 @@
-# Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
-
-# Virtual environment (should never be in HF Space)
+.pytest_cache/
 venv/
-env/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Parent directory files (api folder is separate repo)
-../
+.venv/
+.monitor-state/

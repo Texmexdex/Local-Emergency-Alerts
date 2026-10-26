@@ -1,31 +1,17 @@
 # Python
-venv/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
+.pytest_cache/
+venv/
+.venv/
 
-# Old Streamlit files (not needed for GitHub Pages)
-App.py
-Dashboard.py
-setup.bat
-run.bat
+# Local monitor state
+.monitor-state/
 
-# IDE
+# IDE / OS
 .vscode/
 .idea/
 *.swp
-*.swo
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Logs
 *.log

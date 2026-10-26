@@ -1,21 +1,25 @@
 # Product Overview
 
-Industrial Command Center is a real-time safety monitoring dashboard for tracking industrial incidents, hazardous material releases, and environmental conditions in the Houston Ship Channel area.
+Local Emergency Alerts answers one question for people living near the Houston Ship Channel's industrial facilities: **is there an emergency near me right now, and what should I do?**
 
-## Core Features
+## Core behavior
 
-- **Wind monitoring**: Real-time wind speed and direction from NWS API with plume risk assessment
-- **CAER feed**: Community alert messages from EHCMA incident reporter
-- **Dispatch logs**: Live fire and hazmat incidents from Houston emergency services
-- **Geographic mapping**: Visual display of key industrial facilities and home location
-- **Risk filtering**: Automatic highlighting of high-priority incidents based on location keywords
+- One overall level for the user's location: `action` > `warning` > `advisory` > `clear`, with a list of reasons (source, distance, direction, time) and plain-language guidance (e.g. shelter-in-place steps).
+- Never report a plain "all clear" when a source failed; name the failed sources and link to them.
+- Routine industrial postings (planned flaring, drills, weekly alarm tests, all-clears) must not raise the level.
+- Wind-aware: an active industrial incident upwind of the user escalates, using *observed* wind.
+- Notifications only for new or escalated items: browser notifications while the page is open; ntfy phone push via a scheduled GitHub Action when it's closed.
 
-## Target Users
+## Data sources
 
-Residents living near industrial facilities who need to monitor air quality risks, chemical releases, and emergency incidents in their area.
+- NWS alerts API (point-based; includes non-weather civil alerts like Shelter In Place Warning)
+- NWS station observations (wind)
+- CAER live postings (incident-reporter.net)
+- City of Houston Fire/EMS active incidents (City of Houston only)
+- US Census geocoder (addresses), Open-Meteo (modeled AQI)
 
-## Data Sources
+## Accuracy rules
 
-- National Weather Service API (weather.gov)
-- EHCMA CAER Community Feed (incident-reporter.net)
-- Houston Active Incidents (cohweb.houstontx.gov)
+- Never invent coordinates. Ungeocodable incidents are listed as "not mapped".
+- Use the timestamps the feeds publish (local Houston time), never the fetch time.
+- Approximate facility locations must be flagged as approximate.

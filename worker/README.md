@@ -8,7 +8,7 @@ Cloudflare Worker that serves the dashboard's data and runs the phone-push monit
 
 | Param | Default | |
 |---|---|---|
-| `lat`, `lon` | Channelview, TX | Home location (US only) |
+| `lat`, `lon` | Highlands, TX | Home location (US only) |
 | `radius_mi` or `radius_km` | 10 mi | How far an industrial/fire incident still counts as "near" |
 | `label` | | Display name for the location |
 

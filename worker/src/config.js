@@ -1,8 +1,8 @@
-// Default "home" location: Channelview, TX (north side of the Houston Ship Channel).
+// Default "home" location: Highlands, TX (town centre; east Harris County, near Baytown).
 // Every request can override this with ?lat=&lon=; the monitor reads HOME_* vars.
-export const DEFAULT_LAT = 29.7761;
-export const DEFAULT_LON = -95.1144;
-export const DEFAULT_LABEL = 'Channelview, TX';
+export const DEFAULT_LAT = 29.8188;
+export const DEFAULT_LON = -95.0563;
+export const DEFAULT_LABEL = 'Highlands, TX';
 export const DEFAULT_RADIUS_KM = 16; // ~10 miles
 
 // NWS requires a descriptive User-Agent with contact info.

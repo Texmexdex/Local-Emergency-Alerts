@@ -9,9 +9,9 @@ workers_dev = true
 crons = ["*/2 * * * *"]
 
 [vars]
-HOME_LAT = "29.7761"
-HOME_LON = "-95.1144"
-HOME_LABEL = "Channelview, TX"
+HOME_LAT = "29.8188"
+HOME_LON = "-95.0563"
+HOME_LABEL = "Highlands, TX"
 RADIUS_MI = "10"
 NOTIFY_MIN_LEVEL = "warning"   # action | warning | advisory
 DASHBOARD_URL = "https://texmexdex.github.io/Local-Emergency-Alerts/"

@@ -11,7 +11,7 @@ const API_BASE = (params.get('api') ||
 const NWS = 'https://api.weather.gov';
 const REFRESH_MS = 60 * 1000;
 const SLOW_BACKEND_MS = 7000;
-const DEFAULT_LOCATION = { lat: 29.7761, lon: -95.1144, label: 'Channelview, TX' };
+const DEFAULT_LOCATION = { lat: 29.8188, lon: -95.0563, label: 'Highlands, TX' };
 
 const LEVELS = ['clear', 'info', 'advisory', 'warning', 'action'];
 const LEVEL_TEXT = { action: 'Act now', warning: 'Warning', advisory: 'Advisory', info: 'Routine', clear: 'All clear' };

@@ -48,9 +48,9 @@ test('status endpoint returns the combined assessment with CORS', async () => {
     assert.ok(body.caer.length === 7 && body.fire.length === 4);
 });
 
-test('status defaults to Channelview and validates input', async () => {
+test('status defaults to Highlands and validates input', async () => {
     mockAllSources();
-    assert.equal((await (await get('/api/status')).json()).location.label, 'Channelview, TX');
+    assert.equal((await (await get('/api/status')).json()).location.label, 'Highlands, TX');
     assert.equal((await get('/api/status?lat=abc')).status, 400);
     assert.equal((await get('/api/status?lat=10&lon=-95')).status, 400);
     assert.equal((await get('/api/geocode')).status, 400);

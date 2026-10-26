@@ -169,8 +169,26 @@ async function resolveLocations(raw) {
     await Promise.all(todo.map((a) => geocode.geocode(a, { persist: true })));
 }
 
+/**
+ * Parse the live page, refusing to report "no messages" for a page we don't
+ * recognise. In Oct 2026 the feed switched to a JavaScript app ("eNotify -
+ * Emergency Notification System ... Initializing...") whose initial HTML has
+ * no messages; treating that as an empty feed would be a false all-clear.
+ */
+export function parseLivePage(html) {
+    const postings = parseFeed(html);
+    if (!postings.length && !/CAER Message Postings/i.test(html) && !/Posted On\s*-/i.test(html)) {
+        throw new FormatError('CAER page format not recognised (messages are loaded by JavaScript); cannot read the feed');
+    }
+    return postings;
+}
+
+export class FormatError extends Error {
+    constructor(message) { super(message); this.name = 'FormatError'; }
+}
+
 export async function fetchPostings(homeLat, homeLon, now = Date.now()) {
-    const raw = await cache.getOrFetch('feed', async () => parseFeed(await getText(FEED_URL)));
+    const raw = await cache.getOrFetch('feed', async () => parseLivePage(await getText(FEED_URL)));
     await resolveLocations(raw);
     const postings = await Promise.all(raw.map((r) => buildPosting(r, homeLat, homeLon, now)));
     postings.sort((a, b) => ORDER[a.level] - ORDER[b.level] || (a.age_hours ?? 1e9) - (b.age_hours ?? 1e9));

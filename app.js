@@ -455,7 +455,7 @@ function renderStatus(s) {
     } else if (!s.complete && s.failed_sources?.length) {
         notice.append(
             el('strong', { text: 'This may not be the full picture. ' }),
-            `Couldn't reach: ${s.failed_sources.join('; ')}. `,
+            `Couldn't get data from: ${s.failed_sources.join('; ')}. `,
             'Check those sources directly: ',
             ...Object.entries(SOURCE_LINKS).filter(([k]) => s.sources?.[k] && !s.sources[k].ok)
                 .flatMap(([k, url], i) => [i ? ', ' : '', el('a', { href: url, target: '_blank', rel: 'noopener', text: SOURCE_NAMES[k] })]),

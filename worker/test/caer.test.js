@@ -93,3 +93,12 @@ test('geocodes each new facility address once', async () => {
     await postings();
     assert.equal(calls.filter((c) => c.url.includes('onelineaddress')).length, first);
 });
+
+test('an unrecognised page is a failure, never "no messages"', async () => {
+    const spa = '<html><head><title>eNotify - Emergency Notification System</title></head><body><div id="app">Initializing...</div><script src="main.js"></script></body></html>';
+    assert.throws(() => caer.parseLivePage(spa), { name: 'FormatError' });
+    // A genuinely empty feed in the known format is fine.
+    assert.deepEqual(caer.parseLivePage('<html><head><title>CAER Message Postings</title></head><body></body></html>'), []);
+    mockFetch({ 'incident-reporter.net': () => spa });
+    await assert.rejects(caer.fetchPostings(...HOME, NOW), /format not recognised/);
+});

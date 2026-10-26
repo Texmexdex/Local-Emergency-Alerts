@@ -125,3 +125,17 @@ test('census batch response parsing', () => {
     assert.equal(r.get('1'), null);
     assert.equal(r.get('2'), null);
 });
+
+test('status reports CAER as failed (not all clear) when the page format changes', async () => {
+    mockFetch({
+        'api.weather.gov/alerts': { features: [] },
+        'api.weather.gov/points': () => new Response('down', { status: 503 }),
+        'incident-reporter.net': () => '<html><title>eNotify - Emergency Notification System</title><body>Initializing...</body></html>',
+        'cohweb.houstontx.gov': () => fixture('houston.html'),
+    });
+    const body = await (await get('/api/status')).json();
+    assert.equal(body.sources.caer.ok, false);
+    assert.match(body.sources.caer.error, /FormatError/);
+    assert.equal(body.complete, false);
+    assert.match(body.headline, /sources that responded/);
+});

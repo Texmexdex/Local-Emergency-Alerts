@@ -6,7 +6,7 @@
 // GET /api/geocode?q=<address or place>
 //     Look up coordinates for a home address.
 // GET /api/health
-// GET /api/debug?source=caer|houston|keymap   what an upstream feed returned
+// GET /api/debug?source=caer|caer_app|houston|keymap   what an upstream feed returned
 //
 // The cron trigger (wrangler.toml) runs the ntfy phone-push monitor.
 import { SOURCES, assess } from './assess.js';
@@ -104,6 +104,36 @@ async function debugRoute(params) {
                 text_sample: clean(htmlToText(html.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, ''))).slice(0, 1500),
             });
         }
+        if (source === 'caer_app') {
+            // The CAER page is now a JavaScript app. List what it loads and any
+            // data addresses inside its scripts, to find where messages come from.
+            const page = await describe(caer.FEED_URL);
+            const base = new URL(page.url);
+            const abs = (u) => { try { return new URL(u, base).href; } catch { return null; } };
+            const scripts = [...page.html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi)].map((m) => abs(m[1])).filter(Boolean);
+            const links = [...page.html.matchAll(/<link\b[^>]*\bhref=["']([^"']+)["']/gi)].map((m) => abs(m[1])).filter(Boolean);
+            const inline = [...page.html.matchAll(/<script\b(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1].trim()).filter(Boolean);
+            const URLISH = /["'`]((?:https?:\/\/|\/|\.\.?\/)?[\w\-./]*(?:api|Api|API|json|Json|Message|message|Caer|caer|Feed|feed|hub|Hub|signalr|notif|Notif|odata|graphql)[\w\-./?=&{}$]*)["'`]/g;
+            const hits = (text) => [...new Set([...text.matchAll(URLISH)].map((m) => m[1]).filter((u) => u.length > 3 && u.length < 160))].slice(0, 60);
+            const scanned = [];
+            for (const src of scripts.filter((u) => new URL(u).host === base.host).slice(0, 6)) {
+                try {
+                    const r = await fetch(src, { headers: { 'User-Agent': USER_AGENT }, signal: AbortSignal.timeout(15000) });
+                    const js = (await r.text()).slice(0, 1_500_000);
+                    scanned.push({ src, status: r.status, bytes: js.length, data_addresses: hits(js) });
+                } catch (err) {
+                    scanned.push({ src, error: err.message });
+                }
+            }
+            return json({
+                url: page.url, status: page.status, title: page.title, bytes: page.bytes,
+                scripts, stylesheets_and_links: links.slice(0, 20),
+                inline_scripts: inline.map((t) => t.slice(0, 600)).slice(0, 8),
+                inline_data_addresses: hits(inline.join('\n')),
+                scanned_scripts: scanned,
+                html_head: page.html.slice(0, 2500),
+            });
+        }
         if (source === 'houston') {
             const { html, ...meta } = await describe(houston.FEED_URL);
             const rows = houston.parseTable(html);
@@ -121,7 +151,7 @@ async function debugRoute(params) {
             const found = await keymap.queryService([code]);
             return json({ service: keymap.SERVICE_URL, code, result: found.get(code) || null });
         }
-        return json({ error: 'source must be caer, houston or keymap' }, 400);
+        return json({ error: 'source must be caer, caer_app, houston or keymap' }, 400);
     } catch (err) {
         return json({ source, error: `${err.name}: ${err.message}` }, 502);
     }

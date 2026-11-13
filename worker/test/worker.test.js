@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import * as geocode from '../src/geocode.js';
 import { localToEpoch, toLocalIso } from '../src/http.js';
 import worker from '../src/index.js';
-import { fixture, mockFetch } from './helpers.js';
+import { NOW, fixture, mockFetch } from './helpers.js';
 
 const ctx = () => {
     const pending = [];
@@ -83,7 +83,10 @@ test('facility geocodes persist to KV and are reused by a cold isolate', async (
     assert.equal(kv.puts, 1, 'nothing new, so no extra KV write');
 });
 
-test('cron monitor pushes once and stores state only on change', async () => {
+test('cron monitor pushes once and stores state only on change', async (t) => {
+    // The fixture messages are dated Oct 26, 2026; freeze the clock there so they
+    // count as current regardless of when the test runs.
+    t.mock.timers.enable({ apis: ['Date'], now: NOW });
     const kv = new MemoryKV();
     const env = { STATE: kv, NTFY_TOPIC: 'test-topic', NTFY_SERVER: 'https://ntfy.example', HOME_LAT: '29.7761', HOME_LON: '-95.1144' };
     const sent = mockAllSources();
@@ -93,9 +96,8 @@ test('cron monitor pushes once and stores state only on change', async () => {
     assert.match(sent[0].title, /^ACTION: Example Chemical Baytown/);
     assert.equal(sent[0].url, 'https://ntfy.example/test-topic');
     const writes = kv.puts;
-    await run();
-    assert.equal(sent.length >= 2 && sent.length, sent.length);
     const before = sent.length;
+    await run();
     await run();
     assert.equal(sent.length, before, 'no repeat pushes');
     assert.equal(kv.puts, writes, 'quiet runs do not write KV');

@@ -128,7 +128,7 @@ export function parseBatchResponse(text) {
  * Returns Map(input street -> result | null). Inputs whose batch request
  * failed map to null without being cached, so they are retried next time.
  */
-export async function geocodeStreets(streets, { city, state }) {
+export async function geocodeStreets(streets, { city, state, timeout = 30000 }) {
     const out = new Map();
     const todo = [];
     for (const street of new Set(streets)) {
@@ -145,7 +145,7 @@ export async function geocodeStreets(streets, { city, state }) {
     form.append('benchmark', BENCHMARK);
     let parsed;
     try {
-        parsed = parseBatchResponse(await postText(BATCH_URL, { body: form, timeout: 30000 }));
+        parsed = parseBatchResponse(await postText(BATCH_URL, { body: form, timeout }));
     } catch {
         for (const s of todo) out.set(s, null);
         return out;

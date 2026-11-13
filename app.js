@@ -28,11 +28,15 @@ const SOURCE_NAMES = {
     weather: 'NWS observed wind & weather',
     caer: 'CAER industrial community notifications',
     houston_fire: 'City of Houston Fire/EMS active incidents',
+    police: 'City of Houston Police active incidents',
+    traffic: 'Houston TranStar traffic incidents',
 };
 const CAER_APP_URL = 'https://www.ehcma.org/page/caer-online';
 const SOURCE_LINKS = {
     caer: 'https://www.incident-reporter.net/e-notifycaerfeed/caermessagelive.html',
     houston_fire: 'https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx',
+    police: 'https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx?agency=P',
+    traffic: 'https://traffic.houstontranstar.org/roadclosures/',
     nws_alerts: 'https://www.weather.gov/hgx/',
 };
 const DOWNWIND_HALF_ANGLE = 30, DOWNWIND_MAX_KM = 25, CALM_KMH = 5, CALM_RADIUS_KM = 5;
@@ -46,7 +50,7 @@ function save(key, value) {
 }
 
 const settings = Object.assign(
-    { ...DEFAULT_LOCATION, radiusMi: 10, notify: false, sound: false, minLevel: 'warning', showRoutine: false, showAllFire: false },
+    { ...DEFAULT_LOCATION, radiusMi: 10, notify: false, sound: false, minLevel: 'warning', showRoutine: false, showAllFire: false, showAllIncidents: false, hiddenLayers: [] },
     load('lea.settings', {}),
 );
 if (params.get('lat') && params.get('lon')) {
@@ -128,22 +132,40 @@ async function fetchJSON(url, { timeout = 20000, headers } = {}) {
 }
 
 // ---------- map ----------
-let map, homeLayer, coneLayer, alertLayer, caerLayer, fireLayer;
+let map, homeLayer, coneLayer, alertLayer, caerLayer, fireLayer, policeLayer, trafficLayer;
 const markerById = {};
 
 function initMap() {
     map = L.map('map', { zoomControl: true }).setView([settings.lat, settings.lon], 11);
-    const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    L.tileLayer(`https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'light_all'}/{z}/{x}/{y}{r}.png`, {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-        subdomains: 'abcd',
+    // OpenStreetMap's own tiles need no API key (CARTO's now do). Dark mode
+    // darkens them with a CSS filter on the tile pane (see style.css).
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
     }).addTo(map);
     alertLayer = L.layerGroup().addTo(map);
     coneLayer = L.layerGroup().addTo(map);
     homeLayer = L.layerGroup().addTo(map);
-    fireLayer = L.layerGroup().addTo(map);
-    caerLayer = L.layerGroup().addTo(map);
+    fireLayer = L.layerGroup();
+    policeLayer = L.layerGroup();
+    trafficLayer = L.layerGroup();
+    caerLayer = L.layerGroup();
+    // Layer switches (top right). Hidden layers are remembered per browser.
+    const overlays = {
+        'Weather alert areas': alertLayer, 'Road incidents': trafficLayer, 'Police calls': policeLayer,
+        'Fire / EMS calls': fireLayer, 'Industrial (CAER)': caerLayer,
+    };
+    for (const [name, layer] of Object.entries(overlays)) {
+        if (!settings.hiddenLayers.includes(name)) layer.addTo(map);
+    }
+    L.control.layers(null, overlays, { collapsed: true, position: 'topright' }).addTo(map);
+    const remember = (hidden) => (e) => {
+        settings.hiddenLayers = settings.hiddenLayers.filter((n) => n !== e.name);
+        if (hidden) settings.hiddenLayers.push(e.name);
+        save('lea.settings', settings);
+    };
+    map.on('overlayremove', remember(true));
+    map.on('overlayadd', remember(false));
     drawHome(true);
 }
 
@@ -170,6 +192,8 @@ function popupFor(title, lines) {
 function drawMap(status) {
     caerLayer.clearLayers();
     fireLayer.clearLayers();
+    policeLayer.clearLayers();
+    trafficLayer.clearLayers();
     coneLayer.clearLayers();
     alertLayer.clearLayers();
     for (const k of Object.keys(markerById)) delete markerById[k];
@@ -214,6 +238,25 @@ function drawMap(status) {
             f.location_source === 'keymap' ? `Approximate: centre of Key Map square ${f.key_map} (about ¾ mile across)` : null,
         ])).addTo(fireLayer);
         markerById[f.id] = m;
+    }
+
+    // Police calls and road incidents: routine ones in their own colour so they
+    // don't read as emergencies; anything that raises the verdict uses its level colour.
+    for (const i of visibleIncidents(status)) {
+        if (i.lat == null) continue;
+        const police = i.source === 'police';
+        const color = i.level === 'info' ? cssVar(police ? '--police' : '--traffic') : levelColor(i.level);
+        const m = L.circleMarker([i.lat, i.lon], {
+            radius: i.level === 'info' ? 5 : 8, color, weight: 2, fillColor: color,
+            fillOpacity: i.location_approximate ? 0.15 : 0.75,
+        }).bindPopup(popupFor(police ? `Houston Police: ${i.type}` : `Road incident: ${i.type}`, [
+            incidentPlace(i),
+            when(i.time),
+            i.lanes ? `Lanes affected: ${i.lanes}` : null,
+            i.distance_km != null ? `${kmToMi(i.distance_km)} mi ${i.bearing_from_home || ''} of you` : null,
+            i.location_source === 'keymap' ? `Approximate: centre of Key Map square ${i.key_map} (about ¾ mile across)` : null,
+        ])).addTo(police ? policeLayer : trafficLayer);
+        markerById[i.id] = m;
     }
     updateWindBadge(w);
 }
@@ -317,8 +360,10 @@ function fallbackStatus(nws, pending, backendError) {
         weather: { ok: !nws.errors.weather, error: nws.errors.weather || null },
         caer: { ok: false, pending, error: backendError },
         houston_fire: { ok: false, pending, error: backendError },
+        police: { ok: false, pending, error: backendError, core: false },
+        traffic: { ok: false, pending, error: backendError, core: false },
     };
-    const failed = Object.entries(sources).filter(([, s]) => !s.ok && !s.pending).map(([k]) => SOURCE_NAMES[k]);
+    const failed = Object.entries(sources).filter(([, s]) => !s.ok && !s.pending && s.core !== false).map(([k]) => SOURCE_NAMES[k]);
     const level = reasons.length ? reasons.reduce((m, r) => (rank(r.level) > rank(m) ? r.level : m), 'clear') : 'clear';
     return {
         generated_at: new Date().toISOString(),
@@ -336,6 +381,8 @@ function fallbackStatus(nws, pending, backendError) {
         weather: nws.weather,
         caer: [],
         fire: [],
+        police: [],
+        traffic: [],
     };
 }
 
@@ -395,6 +442,26 @@ function visibleFire(status) {
     return all.filter((f) => f.distance_km != null && f.distance_km <= r && (f.level !== 'info' || ['fire', 'major_fire', 'hazmat'].includes(f.kind)));
 }
 
+/** Police calls and road incidents as one list: within the radius, or region-wide. */
+function allIncidents(status) {
+    const police = (status.police || []).map((p) => ({
+        ...p, source: 'police', time: p.called_at, time_raw: p.call_time_raw,
+    }));
+    const traffic = (status.traffic || []).map((t) => ({ ...t, source: 'traffic', time: t.reported_at }));
+    return [...police, ...traffic].sort((a, b) => rank(b.level) - rank(a.level)
+        || (a.distance_km ?? 1e9) - (b.distance_km ?? 1e9));
+}
+function visibleIncidents(status) {
+    const all = allIncidents(status);
+    if (settings.showAllIncidents) return all;
+    const r = settings.radiusMi / 0.621371;
+    return all.filter((i) => i.distance_km != null && i.distance_km <= r);
+}
+function incidentPlace(i) {
+    if (i.source === 'traffic') return [i.location, i.direction && !i.location?.includes(i.direction) ? i.direction : null].filter(Boolean).join(' · ');
+    return [i.address, i.cross_street].filter(Boolean).join(' & ');
+}
+
 function render(status) {
     lastStatus = status;
     drawMap(status);
@@ -403,6 +470,7 @@ function render(status) {
     renderNws(status);
     renderCaer(status);
     renderFire(status);
+    renderIncidents(status);
     handleNotifications(status);
     $('checked-at').textContent = `Checked ${new Date(status.generated_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
     $('location-label').textContent = settings.label;
@@ -455,7 +523,8 @@ function renderStatus(s) {
         );
     } else if (!s.complete && s.failed_sources?.length) {
         const caerGone = Boolean(s.sources?.caer?.unavailable);
-        const failedKeys = Object.keys(SOURCE_LINKS).filter((k) => s.sources?.[k] && !s.sources[k].ok && !(k === 'caer' && caerGone));
+        const failedKeys = Object.keys(SOURCE_LINKS).filter((k) => s.sources?.[k] && !s.sources[k].ok
+            && s.sources[k].core !== false && !(k === 'caer' && caerGone));
         if (failedKeys.length) {
             notice.append(
                 el('strong', { text: 'This may not be the full picture. ' }),
@@ -594,6 +663,54 @@ function renderFire(s) {
             el('span', { text: f.distance_km != null ? `${kmToMi(f.distance_km)} mi ${f.bearing_from_home || ''}${f.location_approximate ? ' (approx.)' : ''}` : 'not mapped' }),
             f.alarm ? el('span', { text: `Alarm ${f.alarm}` }) : null),
     )));
+}
+
+const INCIDENT_LIMIT = 40;
+const KIND_LABEL = {
+    crash: 'Crash', accident: 'Crash', hazard: 'Road hazard', stall: 'Stall', crime: 'Police', closure: 'Closure',
+    hazmat: 'Hazmat', flooding: 'High water', fire: 'Fire', other: 'Police',
+};
+
+function renderIncidents(s) {
+    const list = $('incident-list');
+    const policeOk = s.sources?.police?.ok;
+    const trafficOk = s.sources?.traffic?.ok;
+    if (!policeOk && !trafficOk) {
+        list.replaceChildren(s.sources?.police?.pending ? el('p', { class: 'muted', text: 'Loading…' })
+            : el('div', { class: 'unavailable' }, 'Police and traffic feeds are unavailable right now. Open ',
+                el('a', { href: SOURCE_LINKS.police, target: '_blank', rel: 'noopener', text: 'Houston Police' }), ' or ',
+                el('a', { href: SOURCE_LINKS.traffic, target: '_blank', rel: 'noopener', text: 'TranStar' }), ' directly.'));
+        $('incident-count').textContent = '';
+        return;
+    }
+    const shown = visibleIncidents(s);
+    const nPolice = shown.filter((i) => i.source === 'police').length;
+    $('incident-count').textContent = `${nPolice} police · ${shown.length - nPolice} road`
+        + (settings.showAllIncidents ? ' region-wide' : ` within ${settings.radiusMi} mi`);
+    const notes = [];
+    if (!policeOk) notes.push(el('p', { class: 'muted', text: 'Houston Police feed unavailable right now; showing road incidents only.' }));
+    if (!trafficOk) notes.push(el('p', { class: 'muted', text: 'TranStar feed unavailable right now; showing police calls only.' }));
+    if (!shown.length) {
+        list.replaceChildren(...notes, el('p', { class: 'empty', text: `✓ No police calls or road incidents within ${settings.radiusMi} mi` }));
+        return;
+    }
+    const items = shown.slice(0, INCIDENT_LIMIT).map((i) => el('div', {
+        class: `item lvl-${i.level} src-${i.source}${i.lat != null ? ' clickable' : ''}`,
+        onclick: i.lat != null ? () => focusOn(i.id) : null,
+    },
+        el('p', { class: 'item-title' },
+            i.level !== 'info' ? badge(i.level) : el('span', { class: `badge src-${i.source}`, text: i.source === 'police' ? 'HPD' : 'Road' }),
+            ' ', i.type),
+        el('p', { class: 'item-meta' },
+            el('span', { text: incidentPlace(i) || 'No location given' }),
+            el('span', { text: i.time ? when(i.time) : i.time_raw || '' }),
+            el('span', { text: i.distance_km != null ? `${kmToMi(i.distance_km)} mi ${i.bearing_from_home || ''}${i.location_approximate ? ' (approx.)' : ''}` : 'not mapped' }),
+            i.lanes ? el('span', { text: `Lanes: ${i.lanes}` }) : null),
+    ));
+    if (shown.length > INCIDENT_LIMIT) {
+        items.push(el('p', { class: 'muted', text: `+ ${shown.length - INCIDENT_LIMIT} more (nearest shown first; all are on the map)` }));
+    }
+    list.replaceChildren(...notes, ...items);
 }
 
 const AQI_BANDS = [[50, 'Good'], [100, 'Moderate'], [150, 'Unhealthy for sensitive groups'], [200, 'Unhealthy'], [300, 'Very unhealthy'], [Infinity, 'Hazardous']];
@@ -741,6 +858,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('min-level-select').value = settings.minLevel;
     $('show-routine').checked = settings.showRoutine;
     $('show-all-fire').checked = settings.showAllFire;
+    $('show-all-incidents').checked = settings.showAllIncidents;
     $('location-label').textContent = settings.label;
 
     $('refresh-btn').addEventListener('click', refresh);
@@ -772,6 +890,10 @@ document.addEventListener('DOMContentLoaded', () => {
     $('show-all-fire').addEventListener('change', (e) => {
         settings.showAllFire = e.target.checked; save('lea.settings', settings);
         if (lastStatus) { renderFire(lastStatus); drawMap(lastStatus); }
+    });
+    $('show-all-incidents').addEventListener('change', (e) => {
+        settings.showAllIncidents = e.target.checked; save('lea.settings', settings);
+        if (lastStatus) { renderIncidents(lastStatus); drawMap(lastStatus); }
     });
 
     const dialog = $('location-dialog');

@@ -25,6 +25,8 @@ If any source can't be reached, the page says so explicitly. It never shows a pl
 | NWS station observations | **Measured** wind direction/speed from the nearest station | Used for downwind checks; falls back to the hourly forecast only if no station has a fresh reading |
 | [CAER live postings](https://www.incident-reporter.net/e-notifycaerfeed/caermessagelive.html) | Community notifications posted by member plants (EHCMA e-Notify) | Each posting is classified: drill / all-clear / routine notice / incident / shelter-evacuate. Location comes from the address in the plant's own message. **Since Oct 20, 2026 the public page requires a sign-in**, so notifications can instead be relayed from the EHCMA CAER Online app on an Android phone (see DEPLOYMENT.md step 4) |
 | [City of Houston active incidents](https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx) | Live Fire/EMS calls | The feed gives street + cross street but no house numbers, so calls are placed at the centre of their Key Map square (~¾ mi) via Harris County's public GIS service. **City of Houston only**: unincorporated Harris County (Channelview, Sheldon, Crosby) isn't in this feed |
+| [City of Houston police calls](https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx?agency=P) | Live HPD calls: crashes, traffic hazards, disturbances… | Placed by street address (Census batch geocoder) or Key Map square. Shown for awareness; only a hazmat call within 5 mi raises the alert level. City of Houston only: Baytown PD and the Harris County Sheriff don't publish live calls |
+| [Houston TranStar incidents](https://traffic.houstontranstar.org/roadclosures/) | Wrecks, stalls, debris, closures and high water on monitored roads region-wide (I-10, Beltway 8, SH 146, SH 225…) | Comes with exact coordinates. A hazmat spill within 5 mi raises a warning, high water within 3 mi an advisory; everything else is informational |
 | [Open-Meteo air quality](https://open-meteo.com/en/docs/air-quality-api) | Regional AQI estimate | A model, not a monitor. It won't see a local plume. See AirNow for official readings |
 
 ### How "downwind" works
@@ -35,6 +37,8 @@ For every active industrial incident, it compares the observed wind with the dir
 
 - **Set your location**: click the 📍 location chip and enter your address (or use GPS). It's saved in your browser only. You can also share a link like `?lat=29.776&lon=-95.114&label=Home`.
 - **Radius**: how far away an industrial or fire incident still counts as "near you" (default 10 mi).
+- **Map layers**: the layers button (top right of the map) shows or hides weather alert areas, road incidents, police calls, fire/EMS calls and industrial sites. Your choice is remembered.
+- **Police calls & road incidents**: listed nearest first within your radius; tick *Show region-wide* to see everything.
 - **Browser notifications / alarm sound**: alerts you when a new warning (or whatever level you pick) appears while the page is open, including in a background tab.
 - **Phone push when the page is closed**: see [Phone alerts](#phone-alerts-ntfy) below.
 
@@ -49,7 +53,8 @@ GitHub Pages (index.html, app.js, style.css, config.js)
 Cloudflare Worker (worker/)      always on, free plan
       ├─ src/nws.js        NWS alerts + observed wind
       ├─ src/caer.js       CAER feed parser + classifier
-      ├─ src/houston.js    Houston Fire/EMS parser + classifier
+      ├─ src/houston.js    Houston Fire/EMS + Police parser + classifiers
+      ├─ src/transtar.js   TranStar traffic incidents (wrecks, closures, spills)
       ├─ src/geocode.js    US Census geocoder (batch for dispatch addresses)
       ├─ src/assess.js     combines everything into one level + reasons
       └─ src/monitor.js    cron every 2 min → ntfy phone push (state in KV)
@@ -57,7 +62,7 @@ Cloudflare Worker (worker/)      always on, free plan
 
 The Worker is built to fit the free plan's limits: 100,000 requests/day, 10 ms CPU and 50 outbound requests per invocation. Feeds are cached for 60 seconds, all Houston dispatch addresses are geocoded in **one** Census batch request, and KV storage is written only when something changes.
 
-If the Worker can't be reached, the page still shows official NWS alerts and wind fetched directly from weather.gov, and says that the industrial and fire feeds are missing.
+If the Worker can't be reached, the page still shows official NWS alerts and wind fetched directly from weather.gov, and says that the industrial and fire feeds are missing. Police and traffic are supplementary: if they are down, the page says so in their own card but doesn't mark the overall answer incomplete.
 
 **Setup:** see [DEPLOYMENT.md](DEPLOYMENT.md). It takes about 10 minutes with a free Cloudflare account.
 

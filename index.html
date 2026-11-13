@@ -70,7 +70,9 @@
                         <span><i class="dot lvl-action"></i>Act now</span>
                         <span><i class="dot lvl-warning"></i>Warning</span>
                         <span><i class="dot lvl-advisory"></i>Advisory</span>
-                        <span><i class="dot lvl-info"></i>Routine</span>
+                        <span><i class="dot lvl-info"></i>Routine fire</span>
+                        <span><i class="dot police"></i>Police call</span>
+                        <span><i class="dot traffic"></i>Road incident</span>
                         <span><i class="cone"></i>Downwind</span>
                     </div>
                 </div>
@@ -80,7 +82,7 @@
                         <span id="wind-badge-text"></span>
                     </div>
                 </div>
-                <p class="fineprint">Industrial sites are placed from the address in their own CAER message; hollow markers are approximate. Houston's dispatch feed has no house numbers, so fire calls are placed at the centre of their Key Map square (about ¾ mile across) and shown hollow. Calls with no usable location are listed but not mapped.</p>
+                <p class="fineprint">Industrial sites are placed from the address in their own CAER message; hollow markers are approximate. Houston's dispatch feed has no house numbers, so fire calls are placed at the centre of their Key Map square (about ¾ mile across) and shown hollow. Police calls are placed by street address. Calls with no usable location are listed but not mapped. Use the layers button (top right of the map) to hide or show each type.</p>
             </section>
 
             <section class="card" id="conditions-card">
@@ -115,6 +117,16 @@
                 <p class="fineprint">Covers the City of Houston only. Unincorporated Harris County (Channelview, Sheldon, Crosby, etc.) and other cities are not included in this feed.</p>
             </section>
 
+            <section class="card" id="incident-card">
+                <div class="card-head">
+                    <h3>Police calls &amp; road incidents <small>Houston Police · TranStar</small></h3>
+                    <span class="count" id="incident-count"></span>
+                </div>
+                <label class="switch small"><input type="checkbox" id="show-all-incidents"> Show region-wide</label>
+                <div class="list" id="incident-list"><p class="muted">Loading…</p></div>
+                <p class="fineprint">Shown for awareness. Police calls are City of Houston only (Baytown, Harris County Sheriff and unincorporated areas like Highlands and Channelview don't publish theirs). Road incidents cover TranStar-monitored freeways and major roads across the region (I-10, Beltway 8, SH 146, SH 225, I-610 and more). Only hazardous-material incidents near you change the alert level above.</p>
+            </section>
+
             <section class="card resources">
                 <div class="card-head"><h3>Get official alerts on your phone</h3></div>
                 <ul>
@@ -125,7 +137,8 @@
                 <div class="card-head"><h3>Primary sources</h3></div>
                 <ul>
                     <li><a href="https://www.incident-reporter.net/e-notifycaerfeed/caermessagelive.html" target="_blank" rel="noopener">CAER live message postings</a></li>
-                    <li><a href="https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx" target="_blank" rel="noopener">City of Houston active incidents</a></li>
+                    <li><a href="https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx" target="_blank" rel="noopener">City of Houston active incidents</a> (<a href="https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx?agency=P" target="_blank" rel="noopener">police</a>)</li>
+                    <li><a href="https://traffic.houstontranstar.org/roadclosures/" target="_blank" rel="noopener">Houston TranStar incidents &amp; closures</a></li>
                     <li><a href="https://www.weather.gov/hgx/" target="_blank" rel="noopener">NWS Houston/Galveston</a></li>
                     <li><a href="https://www.airnow.gov/" target="_blank" rel="noopener">AirNow (official air quality)</a></li>
                     <li><a href="https://www.broadcastify.com/listen/ctid/2623" target="_blank" rel="noopener">Harris County scanner feeds (Broadcastify)</a></li>

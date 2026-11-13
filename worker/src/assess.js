@@ -13,6 +13,7 @@ import { DEFAULT_RADIUS_KM } from './config.js';
 import { DOWNWIND_MAX_KM, downwindExposure, kmToMi, round1 } from './geo.js';
 import * as houston from './houston.js';
 import * as nws from './nws.js';
+import * as transtar from './transtar.js';
 
 export const LEVELS = ['clear', 'info', 'advisory', 'warning', 'action'];
 const HEADLINES = {
@@ -28,7 +29,12 @@ export const SOURCES = {
     weather: ['NWS observed wind & weather', nws.fetchWeather],
     caer: ['CAER industrial community notifications', caer.fetchPostings],
     houston_fire: ['City of Houston Fire/EMS active incidents', houston.fetchIncidents],
+    police: ['City of Houston Police active incidents', houston.fetchPolice],
+    traffic: ['Houston TranStar traffic incidents', transtar.fetchIncidents],
 };
+// Sources the "is there an emergency" answer depends on. Police and traffic are
+// shown for awareness; if they are down the verdict isn't marked incomplete.
+export const CORE_SOURCES = ['nws_alerts', 'weather', 'caer', 'houston_fire'];
 
 export const rank = (level) => LEVELS.indexOf(level);
 const mi = (km) => round1(kmToMi(km));
@@ -95,6 +101,25 @@ export function build(lat, lon, results, { radiusKm = DEFAULT_RADIUS_KM, label =
         });
     }
 
+    const police = results.police?.data || [];
+    const traffic = results.traffic?.data || [];
+    for (const p of police) {
+        if (p.level === 'info' || p.distance_km == null || p.distance_km > radiusKm) continue;
+        reasons.push({
+            id: p.id, level: p.level, source: 'HPD', title: `Houston Police: ${p.type}`,
+            detail: [p.address, p.cross_street].filter(Boolean).join(', '), instruction: null,
+            time: p.called_at, expires: null, distance_mi: mi(p.distance_km), direction: p.bearing_from_home, url: p.url,
+        });
+    }
+    for (const t of traffic) {
+        if (t.level === 'info' || t.distance_km == null || t.distance_km > radiusKm) continue;
+        reasons.push({
+            id: t.id, level: t.level, source: 'TranStar', title: `Road incident: ${t.type}`,
+            detail: [t.location, t.lanes && `lanes: ${t.lanes}`].filter(Boolean).join(' · '), instruction: null,
+            time: t.reported_at, expires: null, distance_mi: mi(t.distance_km), direction: t.bearing_from_home, url: t.url,
+        });
+    }
+
     for (const f of fires) {
         if (f.level === 'info' || f.distance_km == null || f.distance_km > radiusKm) continue;
         reasons.push({
@@ -106,7 +131,7 @@ export function build(lat, lon, results, { radiusKm = DEFAULT_RADIUS_KM, label =
 
     reasons.sort((a, b) => rank(b.level) - rank(a.level) || (a.distance_mi ?? 1e9) - (b.distance_mi ?? 1e9));
     const level = reasons.length ? reasons[0].level : 'clear';
-    const failed = Object.keys(SOURCES).filter((k) => results[k] && !results[k].ok).map((k) => SOURCES[k][0]);
+    const failed = CORE_SOURCES.filter((k) => results[k] && !results[k].ok).map((k) => SOURCES[k][0]);
     const headline = level === 'clear' && failed.length ? 'No emergencies found in the sources that responded' : HEADLINES[level];
 
     return {
@@ -123,6 +148,7 @@ export function build(lat, lon, results, { radiusKm = DEFAULT_RADIUS_KM, label =
         sources: Object.fromEntries(Object.keys(SOURCES).filter((k) => results[k]).map((k) => [k, {
             name: SOURCES[k][0], ok: results[k].ok, error: results[k].error, ms: results[k].ms,
             unavailable: Boolean(results[k].unavailable),
+            core: CORE_SOURCES.includes(k),
             meta: results[k].meta ?? null,
             count: Array.isArray(results[k].data) ? results[k].data.length : null,
         }])),
@@ -130,6 +156,8 @@ export function build(lat, lon, results, { radiusKm = DEFAULT_RADIUS_KM, label =
         weather,
         caer: postings,
         fire: fires,
+        police,
+        traffic,
     };
 }
 

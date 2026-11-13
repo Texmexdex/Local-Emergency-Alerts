@@ -6,6 +6,7 @@ import * as geocode from '../src/geocode.js';
 import * as houston from '../src/houston.js';
 import * as keymap from '../src/keymap.js';
 import * as nws from '../src/nws.js';
+import * as transtar from '../src/transtar.js';
 
 export const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 
@@ -82,7 +83,7 @@ export function mockFetch(routes = {}) {
 }
 
 export function resetAll() {
-    for (const c of [caer.cache, houston.cache, ...Object.values(nws.caches)]) c.clear();
+    for (const c of [caer.cache, houston.cache, houston.policeCache, transtar.cache, ...Object.values(nws.caches)]) c.clear();
     caer._reset();
     geocode._reset();
     keymap._reset();

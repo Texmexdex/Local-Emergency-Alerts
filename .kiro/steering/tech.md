@@ -1,6 +1,6 @@
 # Technology Stack
 
-- **Frontend**: plain HTML/CSS/JS (no build step), Leaflet 1.9.4 from unpkg, CARTO basemap tiles
+- **Frontend**: plain HTML/CSS/JS (no build step), Leaflet 1.9.4 from unpkg, OpenStreetMap tiles (no API key)
 - **Backend**: Cloudflare Worker (JavaScript ES modules, no runtime dependencies), Wrangler 4 for dev/deploy, KV for monitor state
 - **Hosting**: GitHub Pages (frontend), Cloudflare Workers free plan (backend + cron)
 - **Notifications**: Web Notifications API + WebAudio in the browser; ntfy.sh from the Worker's cron trigger

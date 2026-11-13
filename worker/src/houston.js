@@ -9,7 +9,9 @@ import * as keymap from './keymap.js';
 import { TTLCache, clean, getText, htmlToText, localParts, localToEpoch, toLocalIso } from './http.js';
 
 export const FEED_URL = 'https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx';
+export const POLICE_URL = 'https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx?agency=P';
 export const cache = new TTLCache(60_000);
+export const policeCache = new TTLCache(60_000);
 
 const COLUMN_KEYS = [
     ['agency', 'agency'],
@@ -114,27 +116,39 @@ export function classify(row, distanceKm) {
     return ['info', 'other'];
 }
 
-async function idFor(key) {
+async function idFor(prefix, key) {
     const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(key));
-    return `hfd-${[...new Uint8Array(buf)].slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+    return `${prefix}-${[...new Uint8Array(buf)].slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
-export async function fetchIncidents(homeLat, homeLon, now = Date.now()) {
-    const rows = await cache.getOrFetch('feed', async () => parseTable(await getText(FEED_URL)));
-    const fireRows = rows.filter((r) => !r.agency || r.agency.toUpperCase().startsWith('F'));
-    // The live feed usually omits house numbers ("AUGUSTA DR" @ "BURGOYNE RD"),
-    // so most calls are placed at the centre of their Key Map square instead.
+const POLICE_HAZMAT_RE = /HAZMAT|HAZ\W*MAT|HAZARDOUS|CHEMICAL|EXPLOS|BOMB|GAS LEAK|TOXIC|RADIOLOG/;
+
+/** Police calls are shown for awareness; only hazardous-material calls near home affect the verdict. */
+export function classifyPolice(row, distanceKmFromHome) {
+    const t = (row.type || '').toUpperCase();
+    const near = distanceKmFromHome != null && distanceKmFromHome <= 8;
+    if (POLICE_HAZMAT_RE.test(t)) return [near ? 'warning' : 'info', 'hazmat'];
+    if (/CRASH|ACCIDENT|COLLISION/.test(t)) return ['info', 'crash'];
+    if (/TRAFFIC HAZARD|STALL|DEBRIS/.test(t)) return ['info', 'hazard'];
+    if (/SHOOT|SHOTS|WEAPON|ASSAULT|ROBBERY|BURGLAR|THEFT|DISTURB|FIGHT|SUSPICIOUS/.test(t)) return ['info', 'crime'];
+    return ['info', 'other'];
+}
+
+/** Locate rows (address when it has a house number, else Key Map square), classify and normalize. */
+async function buildIncidents(rows, homeLat, homeLon, now, { classifyRow, prefix, url, geocodeTimeout }) {
+    // The live feeds often omit house numbers ("AUGUSTA DR" @ "BURGOYNE RD"),
+    // so those calls are placed at the centre of their Key Map square instead.
     const [streets, squares] = await Promise.all([
-        geocode.geocodeStreets(fireRows.map((r) => r.address).filter((a) => /\d/.test(a || '')), { city: 'Houston', state: 'TX' }),
-        keymap.lookup(fireRows.map((r) => r.key_map)),
+        geocode.geocodeStreets(rows.map((r) => r.address).filter((a) => /\d/.test(a || '')), { city: 'Houston', state: 'TX', timeout: geocodeTimeout }),
+        keymap.lookup(rows.map((r) => r.key_map)),
     ]);
-    const incidents = await Promise.all(fireRows.map(async (r) => {
+    const incidents = await Promise.all(rows.map(async (r) => {
         const loc = (r.address && streets.get(r.address)) || squares.get(keymap.normalizeCode(r.key_map)) || null;
         const dist = loc ? round1(distanceKm(homeLat, homeLon, loc.lat, loc.lon)) : null;
-        const [level, kind] = classify(r, dist);
+        const [level, kind] = classifyRow(r, dist);
         const called = parseCallTime(r.call_time, now);
         return {
-            id: await idFor(`${r.address}|${r.call_time}|${r.type}`),
+            id: await idFor(prefix, `${r.address}|${r.call_time}|${r.type}`),
             type: r.type || 'Incident',
             address: r.address ?? null,
             cross_street: r.cross_street ?? null,
@@ -151,9 +165,24 @@ export async function fetchIncidents(homeLat, homeLon, now = Date.now()) {
             location_source: loc ? (loc.approximate ? 'keymap' : 'address') : null,
             distance_km: dist,
             bearing_from_home: loc ? compass(bearingDeg(homeLat, homeLon, loc.lat, loc.lon)) : null,
-            url: FEED_URL,
+            url,
         };
     }));
     incidents.sort((a, b) => ORDER[a.level] - ORDER[b.level] || (a.distance_km ?? 1e9) - (b.distance_km ?? 1e9));
     return incidents;
+}
+
+export async function fetchIncidents(homeLat, homeLon, now = Date.now()) {
+    const rows = await cache.getOrFetch('feed', async () => parseTable(await getText(FEED_URL)));
+    const fireRows = rows.filter((r) => !r.agency || r.agency.toUpperCase().startsWith('F'));
+    return buildIncidents(fireRows, homeLat, homeLon, now, { classifyRow: classify, prefix: 'hfd', url: FEED_URL });
+}
+
+/** City of Houston Police active calls (same table layout as the fire view). */
+export async function fetchPolice(homeLat, homeLon, now = Date.now()) {
+    const rows = await policeCache.getOrFetch('feed', async () => parseTable(await getText(POLICE_URL)));
+    return buildIncidents(rows, homeLat, homeLon, now, {
+        classifyRow: classifyPolice, prefix: 'hpd', url: POLICE_URL,
+        geocodeTimeout: 12_000, // police lists run long; don't let them hold up the page
+    });
 }

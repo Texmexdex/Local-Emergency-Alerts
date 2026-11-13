@@ -94,6 +94,9 @@ test('ingest endpoint requires configuration and the right token', async () => {
     const viaHeader = await post('/api/ingest/notification', { ...SIP, text: `${SIP.text} Update.` }, env,
         { 'Content-Type': 'application/json', Authorization: 'Bearer s3cret-token' });
     assert.equal(viaHeader.status, 202);
+    const broken = await post('/api/ingest/notification?token=s3cret-token',
+        '{"title": "Plant", "text": "Residents say "smoke" is visible"}', env);
+    assert.equal((await broken.json()).stored, true, 'malformed JSON from a forwarder is kept as text');
     const plain = await post('/api/ingest/notification?token=s3cret-token', 'Plain text notification body', env, { 'Content-Type': 'text/plain' });
     assert.equal((await plain.json()).stored, true);
     const hb = await post('/api/ingest/notification?token=s3cret-token&heartbeat=1', '', env, {});

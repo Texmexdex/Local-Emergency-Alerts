@@ -66,15 +66,16 @@ Since Oct 20, 2026 the public CAER web page requires a sign-in, but the **EHCMA 
 
 1. **KV storage:** this needs the `STATE` KV namespace from step 3.
 2. **Pick a long random token** (about 30+ characters; a password manager can generate one). In Cloudflare: your Worker → *Settings → Variables and Secrets → Add* → type **Secret**, name `INGEST_TOKEN`, value = the token. `/api/health` should then show `"phone_relay": {"enabled": true}`.
-3. **On the phone:**
-   - Install **EHCMA CAER Online** and turn on notifications for every region it lets you subscribe to.
-   - In Android settings, turn off battery optimization for the CAER app and the forwarder app so they aren't put to sleep.
-4. **Install a notification forwarder** that can send an HTTP request when a notification arrives. Tasker with the AutoNotification plugin works; so do apps sold as "notification to webhook" forwarders. Set it to:
-   - **Only** forward notifications from the EHCMA CAER Online app.
-   - Method **POST** to `https://local-emergency-alerts.<subdomain>.workers.dev/api/ingest/notification`
-   - Header `Authorization: Bearer <your token>`. If the app can't set headers, add `?token=<your token>` to the URL instead.
-   - Header `Content-Type: application/json` with body `{"title": "<notification title>", "text": "<notification text>", "app": "<app package>"}`, using the forwarder's own placeholders for title, text and package. Plain-text bodies are also accepted.
-5. **Heartbeat (recommended):** have the phone POST to the same URL with `?heartbeat=1` added (plus the token) about once an hour. Without it, a quiet phone looks the same as an offline one. With it, the dashboard warns you if the phone hasn't checked in for 6 hours.
+3. **On the phone, set up the CAER app:** install **EHCMA CAER Online**, open *Preferences*, turn on push notifications and choose every LEPC location it offers.
+4. **Install the CAER Relay app** (built from `android/` in this repo):
+   - On the phone, download `caer-relay.apk` from the repo's **Releases** page (the "CAER Relay (Android)" release), and allow your browser to install unknown apps when Android asks.
+   - Open **CAER Relay**: the Worker address is prefilled; paste your `INGEST_TOKEN` as the relay password and tap **Save**.
+   - Tap **1. Allow notification access** and switch CAER Relay on.
+   - Tap **2. Don't let Android put this app to sleep** and set CAER Relay to *Unrestricted* / *Don't optimize*.
+   - Tap **3. Send a test message**: it should say *delivered*.
+   - It forwards notifications from any app whose name contains "CAER", sends an hourly heartbeat (so the dashboard can tell a quiet phone from an offline one), queues messages while offline, and restarts its heartbeat after a reboot.
+   - Updates are signed with a new key each build for now, so if Android refuses to install an update, uninstall the old CAER Relay first (and re-enter the password).
+5. **No-app alternative:** any forwarder that can send an HTTP POST works: POST the notification to `https://local-emergency-alerts.<subdomain>.workers.dev/api/ingest/notification?token=<your token>` (or send the token as `Authorization: Bearer <token>`) with the notification text as the body (JSON `{"title": ..., "text": ...}` or plain text). Add `&heartbeat=1` for an hourly heartbeat.
 6. **Test from a computer:**
    ```bash
    curl -X POST "https://local-emergency-alerts.<subdomain>.workers.dev/api/ingest/notification" \

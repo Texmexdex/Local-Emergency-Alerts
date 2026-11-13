@@ -220,9 +220,10 @@ async function ingestRoute(request, env, url) {
     let payload;
     const type = request.headers.get('Content-Type') || '';
     try {
-        if (type.includes('json')) payload = await request.json();
-        else if (type.includes('form')) payload = Object.fromEntries(await request.formData());
+        if (type.includes('form')) payload = Object.fromEntries(await request.formData());
         else {
+            // Forwarder apps paste notification text straight into a JSON template, so a
+            // quote in the message can make the JSON invalid; keep the text rather than drop it.
             const text = await request.text();
             try { payload = JSON.parse(text); } catch { payload = { text }; }
         }

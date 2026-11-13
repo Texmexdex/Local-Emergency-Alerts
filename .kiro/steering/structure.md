@@ -1,48 +1,33 @@
 # Project Structure
 
-## Root Files
+## Frontend (repo root, GitHub Pages)
 
-- `App.py`: Main dashboard application (primary entry point)
-- `Dashboard.py`: Alternative/unabridged dashboard view
-- `requirements.txt`: Python dependencies
-- `setup.bat`: Initial environment setup script
-- `run.bat`: Launch script with auto-setup
-- `venv/`: Python virtual environment (gitignored)
+- `index.html`: page layout (status banner, map, source cards, location dialog)
+- `config.js`: `apiBase` URL of the deployed Worker
+- `app.js`: fetches `/api/status`, NWS-direct fallback, rendering, Leaflet map, notifications, location settings (localStorage)
+- `style.css`: design tokens with light/dark themes; level colors `--action/--warning/--advisory/--clear/--info`
 
-## Code Organization
+## Backend (`worker/`, Cloudflare Worker)
 
-### App.py (Main Dashboard)
+- `src/index.js`: routes `/api/status`, `/api/geocode`, `/api/health`; `scheduled()` runs the monitor
+- `src/config.js`: defaults (home location, radius, User-Agent, timezone)
+- `src/http.js`: fetch helpers, per-isolate `TTLCache`, Houston local-time conversion, HTML-to-text
+- `src/geo.js`: distance, bearing, compass, downwind exposure
+- `src/geocode.js`: Census one-line + batch geocoder, caching, KV persistence, `KNOWN_SITES` approximate fallbacks
+- `src/nws.js`, `caer.js`, `houston.js`: one module per source: fetch, parse, normalize, classify
+- `src/assess.js`: combines sources into level + reasons
+- `src/monitor.js`: ntfy notifier (cron), state in the `STATE` KV namespace
+- `test/`: `node:test` suite with HTML fixtures; `helpers.js` mocks `fetch` (no network)
+- `wrangler.toml`: cron schedule, `[vars]` (home location), optional KV binding
 
-- **Configuration**: Page config, location coordinates, HTTP headers
-- **Data engines**: Cached functions for fetching wind, CAER, and dispatch data
-- **UI layout**: Sidebar + 3-tab interface (Dispatch, CAER, Map)
+## Automation (`.github/workflows/`)
 
-### Dashboard.py (Alternative View)
+- `tests.yml`: Worker tests plus a `wrangler deploy --dry-run` bundle check on every push/PR
+- Deploys happen through Cloudflare's Git integration (or `npx wrangler deploy`), not GitHub Actions
 
-- Similar structure but with unabridged CAER feed display
-- 2-column layout instead of tabs
+## Patterns
 
-## Key Patterns
-
-### Data Fetching
-
-All data fetching functions follow error-handling patterns:
-- Try/except blocks with fallback values
-- Timeout parameters on HTTP requests
-- Graceful degradation when APIs fail
-
-### Caching
-
-Wind data uses `@st.cache_data(ttl=60)` for 60-second cache to reduce API calls.
-
-### Filtering Logic
-
-- **Dispatch logs**: Keyword-based filtering (SHELDON, BAYWAY, CHANNELVIEW, FIRE, HAZMAT, etc.)
-- **CAER messages**: Severity-based color coding (error/warning/info)
-- **Wind risk**: Direction-based assessment (N/E winds = risk)
-
-## Constants
-
-- `LOCATIONS`: Dictionary of facility coordinates for mapping
-- `HEADERS`: User-Agent string for web scraping
-- Keywords for filtering are hardcoded strings in filter logic
+- Each source fails independently; `assess.gather` records `ok/error` per source.
+- Classification is rule-based (regexes in `caer.js`, `houston.js`, `ACTION_EVENTS` in `nws.js`). Add a fixture + test for any new rule.
+- `app.js` `NWS_ACTION_EVENTS` mirrors `ACTION_EVENTS` in `worker/src/nws.js`. Keep them in sync.
+- Free-plan limits shape the code: 10 ms CPU (regex parsing, 60 s feed cache), 50 subrequests (batch geocoding, capped one-line lookups), KV writes only on change.

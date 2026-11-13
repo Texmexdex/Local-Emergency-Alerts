@@ -1,31 +1,13 @@
-# Python
-venv/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
+# Node / Wrangler
+node_modules/
+.wrangler/
+worker/dist/
+.dev.vars
 
-# Old Streamlit files (not needed for GitHub Pages)
-App.py
-Dashboard.py
-setup.bat
-run.bat
-
-# IDE
+# IDE / OS
 .vscode/
 .idea/
 *.swp
-*.swo
-
-# OS
 .DS_Store
 Thumbs.db
-
-# Logs
 *.log

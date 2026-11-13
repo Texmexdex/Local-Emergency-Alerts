@@ -92,6 +92,11 @@ const PROBES = {
     hcpcs_camp: 'https://pcs.harriscountytx.gov/Camp-dashboard',
     news_abc13: 'https://abc13.com/feed/',
     news_hpm: 'https://www.houstonpublicmedia.org/feed/',
+    // Police calls, wrecks and road incidents
+    hpd_calls: 'https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx?agency=P',
+    hcso_p2c: 'https://hcsop2c.cad.hctx.net/',
+    transtar_layer: 'https://traffic.houstontranstar.org/data/layers/incidents_json.js',
+    transtar_rss_info: 'https://traffic.houstontranstar.org/rss/rss_info.aspx',
 };
 
 // What an upstream feed actually returned, for checking parsers against live
@@ -159,10 +164,11 @@ async function debugRoute(params) {
             const base = new URL(page.url);
             const abs = (u) => { try { return new URL(u, base).href; } catch { return null; } };
             const linkRe = /<a\b[^>]*\bhref=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+            const seenHrefs = new Set();
             const links = [...html.matchAll(linkRe)]
                 .map((m) => ({ text: clean(htmlToText(m[2])).slice(0, 60), href: abs(m[1]) }))
-                .filter((l) => l.href && /cgi-bin|agc|summary|monops|eer|fuseaction|arcgis|rest\/services|feed|rss|json|api/i.test(l.href))
-                .slice(0, 40);
+                .filter((l) => l.href && !/^javascript:|^mailto:/i.test(l.href) && !seenHrefs.has(l.href) && seenHrefs.add(l.href))
+                .slice(0, 60);
             const forms = [...html.matchAll(/<form\b([^>]*)>([\s\S]*?)<\/form>/gi)].slice(0, 3).map((m) => ({
                 action: /action=["']([^"']*)["']/i.exec(m[1])?.[1] ?? null,
                 method: /method=["']([^"']*)["']/i.exec(m[1])?.[1] ?? 'get',

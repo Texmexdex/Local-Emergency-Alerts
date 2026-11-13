@@ -26,3 +26,21 @@ id = "998e313e23ee48d285d7b3d90f0b7e1f"
 
 [observability]
 enabled = true
+
+# Preview builds (Cloudflare builds these for branches other than main, e.g.
+# pull requests) must declare their own settings. Previews never run the cron
+# monitor; they share the STATE namespace on purpose, so a preview of a pull
+# request reads the same relayed notifications. To isolate them instead,
+# create a second KV namespace and put its id below.
+[previews.vars]
+HOME_LAT = "29.8188"
+HOME_LON = "-95.0563"
+HOME_LABEL = "Highlands, TX"
+RADIUS_MI = "10"
+NOTIFY_MIN_LEVEL = "warning"
+DASHBOARD_URL = "https://texmexdex.github.io/Local-Emergency-Alerts/"
+NTFY_SERVER = "https://ntfy.sh"
+
+[[previews.kv_namespaces]]
+binding = "STATE"
+id = "998e313e23ee48d285d7b3d90f0b7e1f"

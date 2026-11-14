@@ -27,6 +27,7 @@ If any source can't be reached, the page says so explicitly. It never shows a pl
 | [City of Houston active incidents](https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx) | Live Fire/EMS calls | The feed gives street + cross street but no house numbers, so calls are placed at the centre of their Key Map square (~¾ mi) via Harris County's public GIS service. **City of Houston only**: unincorporated Harris County (Channelview, Sheldon, Crosby) isn't in this feed |
 | [City of Houston police calls](https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx?agency=P) | Live HPD calls: crashes, traffic hazards, disturbances… | Placed by street address (Census batch geocoder) or Key Map square. Shown for awareness; only a hazmat call within 5 mi raises the alert level. City of Houston only: Baytown PD and the Harris County Sheriff don't publish live calls |
 | [Houston TranStar incidents](https://traffic.houstontranstar.org/roadclosures/) | Wrecks, stalls, debris, closures and high water on monitored roads region-wide (I-10, Beltway 8, SH 146, SH 225…) | Comes with exact coordinates. A hazmat spill within 5 mi raises a warning, high water within 3 mi an advisory; everything else is informational |
+| Scanner alerts & official texts (phone relay) | Dispatch-radio incidents from a scanner-alert app (CrimeRadar) and texts from senders you choose (e.g. Ready Harris), forwarded by the Alert Relay app | Covers unincorporated areas and cities with no public calls feed. Scanner reports are AI summaries of first dispatch traffic, so they're marked unconfirmed and can raise the level to *advisory* at most. Placed by street address, or at the centre of the community they name |
 | [Open-Meteo air quality](https://open-meteo.com/en/docs/air-quality-api) | Regional AQI estimate | A model, not a monitor. It won't see a local plume. See AirNow for official readings |
 
 ### How "downwind" works
@@ -55,6 +56,8 @@ Cloudflare Worker (worker/)      always on, free plan
       ├─ src/caer.js       CAER feed parser + classifier
       ├─ src/houston.js    Houston Fire/EMS + Police parser + classifiers
       ├─ src/transtar.js   TranStar traffic incidents (wrecks, closures, spills)
+      ├─ src/relay.js      notifications forwarded from your phone (CAER app + others)
+      ├─ src/community.js  scanner reports & official texts from the relay
       ├─ src/geocode.js    US Census geocoder (batch for dispatch addresses)
       ├─ src/assess.js     combines everything into one level + reasons
       └─ src/monitor.js    cron every 2 min → ntfy phone push (state in KV)

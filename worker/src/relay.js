@@ -1,10 +1,15 @@
-// Plant notifications relayed from your own phone.
+// Notifications relayed from your own phone.
 //
 // The public CAER web feed now requires a sign-in, but the EHCMA CAER Online
 // app still sends push notifications to residents. A notification-forwarder
 // app on an Android phone (an old spare phone on WiFi works well) can POST
 // each notification it receives to /api/ingest/notification. They are kept
 // in KV for a week and fed through the same CAER classifier as the old feed.
+//
+// The same relay also forwards other apps the user picks on the phone (a
+// scanner-alert app such as CrimeRadar, texts from Ready Harris...). Those
+// are stored with channel "community" and shown by community.js; only
+// notifications from the CAER app feed the industrial panel.
 //
 // This is your own copy of alerts sent to you; keep the dashboard private
 // and don't republish them.
@@ -35,12 +40,23 @@ export function normalize(payload, now = Date.now()) {
     const p = payload || {};
     const title = clean(first(p.title, p.notification_title, p.android_title, p.subject)).slice(0, 200);
     const text = clean(first(p.text, p.message, p.body, p.bigtext, p.bigText, p.big_text, p.content, p.android_text)).slice(0, 4000);
-    return {
-        title,
-        text,
-        app: clean(first(p.app, p.package, p.packageName, p.package_name, p.app_name)).slice(0, 120) || null,
-        received_at: parseTime(p.time ?? p.timestamp ?? p.posted_at ?? p.when, now),
-    };
+    const app = clean(first(p.app, p.package, p.packageName, p.package_name, p.app_name)).slice(0, 120) || null;
+    const pkg = clean(first(p.package, p.packageName, p.package_name)).slice(0, 120) || null;
+    const n = { title, text, app, package: pkg, received_at: parseTime(p.time ?? p.timestamp ?? p.posted_at ?? p.when, now) };
+    n.channel = channelOf(n);
+    return n;
+}
+
+const CAER_APP_RE = /caer|ehcma|e-?notify/i;
+
+/**
+ * "caer" for the CAER app (and anything that doesn't say which app it came
+ * from, as older forwarders didn't); "community" for every other app.
+ */
+export function channelOf({ app, package: pkg, channel } = {}) {
+    if (channel) return channel;
+    if (!app && !pkg) return 'caer';
+    return CAER_APP_RE.test(`${app || ''} ${pkg || ''}`) ? 'caer' : 'community';
 }
 
 async function load(kv) {
@@ -48,8 +64,11 @@ async function load(kv) {
     return raw ? JSON.parse(raw) : { items: [], heartbeat_at: null };
 }
 
-/** Store one forwarded notification (or a heartbeat). Writes KV only on change. */
-export async function ingest(kv, payload, now = Date.now()) {
+/**
+ * Store one forwarded notification (or a heartbeat). Writes KV only on change.
+ * `enrich(item)` may add fields (e.g. a location) to a new item before it is saved.
+ */
+export async function ingest(kv, payload, now = Date.now(), { enrich } = {}) {
     const state = await load(kv);
     if (payload?.heartbeat) {
         state.heartbeat_at = now;
@@ -61,17 +80,21 @@ export async function ingest(kv, payload, now = Date.now()) {
     const id = await hash(`${n.title}|${n.text}`);
     state.items = state.items.filter((i) => now - i.received_at < KEEP_MS);
     if (state.items.some((i) => i.id === id)) return { stored: false, duplicate: true, id };
-    state.items.unshift({ id, ...n });
+    const item = { id, ...n };
+    if (enrich) {
+        try { Object.assign(item, await enrich(item)); } catch { /* store it without the extras */ }
+    }
+    state.items.unshift(item);
     state.items = state.items.slice(0, MAX_ITEMS);
     state.last_received_at = now;
     await kv.put(KEY, JSON.stringify(state));
-    return { stored: true, id };
+    return { stored: true, id, channel: item.channel };
 }
 
-/** Everything relayed in the last week plus relay health. */
-export async function recent(kv, now = Date.now()) {
+/** Everything relayed in the last week (optionally one channel) plus relay health. */
+export async function recent(kv, now = Date.now(), { channel = null } = {}) {
     const state = await load(kv);
-    const items = state.items.filter((i) => now - i.received_at < KEEP_MS);
+    const items = state.items.filter((i) => now - i.received_at < KEEP_MS && (!channel || channelOf(i) === channel));
     const lastSeen = Math.max(state.heartbeat_at || 0, state.last_received_at || 0) || null;
     const stale = state.heartbeat_at != null && now - lastSeen > STALE_AFTER_MS;
     return { items, last_seen_at: lastSeen, heartbeat: state.heartbeat_at != null, stale };

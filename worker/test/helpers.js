@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach } from 'node:test';
 
 import * as caer from '../src/caer.js';
+import * as community from '../src/community.js';
 import * as geocode from '../src/geocode.js';
 import * as houston from '../src/houston.js';
 import * as keymap from '../src/keymap.js';
@@ -32,6 +33,8 @@ export const GEOCODES = {
     '1000 MAIN ST': [29.7560, -95.3630],
     '2000 SMITH ST': [29.7520, -95.3720],
     '3000 FANNIN ST': [29.7420, -95.3780],
+    '1500 SAN JACINTO ST, BAYTOWN, TX': [29.7700, -95.0500],
+    '400 MAIN ST, DALLAS, TX': [32.7800, -96.8000],
 };
 
 const realFetch = globalThis.fetch;
@@ -85,6 +88,7 @@ export function mockFetch(routes = {}) {
 export function resetAll() {
     for (const c of [caer.cache, houston.cache, houston.policeCache, transtar.cache, ...Object.values(nws.caches)]) c.clear();
     caer._reset();
+    community._reset();
     geocode._reset();
     keymap._reset();
     calls.length = 0;

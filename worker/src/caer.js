@@ -223,7 +223,7 @@ export async function fetchPostings(homeLat, homeLon, now = Date.now()) {
         raw = await cache.getOrFetch('feed', async () => parseLivePage(await getText(FEED_URL)));
     } catch (err) {
         if (!err.unavailable || !relayStore) throw err;
-        const r = await relay.recent(relayStore, now);
+        const r = await relay.recent(relayStore, now, { channel: 'caer' });
         if (r.last_seen_at == null) throw err; // relay never set up
         if (r.stale) {
             throw new FormatError(

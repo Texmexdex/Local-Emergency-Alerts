@@ -20,6 +20,7 @@ public class MainActivity extends Activity {
     private EditText workerUrl;
     private EditText token;
     private EditText appMatch;
+    private EditText smsSenders;
     private TextView status;
 
     @Override
@@ -30,8 +31,9 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(pad, pad, pad, pad);
 
-        root.addView(text("Forwards notifications from the EHCMA CAER Online app to your "
-                + "Local Emergency Alerts Worker. Keep this phone plugged in and on WiFi.", 15));
+        root.addView(text("Forwards alerts from the apps you list below (CAER Online, CrimeRadar...) "
+                + "and texts from the senders you list to your Local Emergency Alerts Worker. "
+                + "Nothing else leaves the phone. Keep it plugged in and on WiFi.", 15));
 
         root.addView(label("Worker address"));
         workerUrl = edit(Prefs.workerUrl(this), InputType.TYPE_TEXT_VARIATION_URI);
@@ -41,9 +43,14 @@ public class MainActivity extends Activity {
         token = edit(Prefs.token(this), InputType.TYPE_TEXT_VARIATION_PASSWORD);
         root.addView(token);
 
-        root.addView(label("Forward apps whose name contains"));
+        root.addView(label("Forward these apps (names, separated by commas)"));
         appMatch = edit(Prefs.appMatch(this), InputType.TYPE_TEXT_VARIATION_NORMAL);
         root.addView(appMatch);
+
+        root.addView(label("Forward texts from senders containing (optional, separated by commas; "
+                + "e.g. the name or short code Ready Harris texts you from)"));
+        smsSenders = edit(Prefs.smsSenders(this), InputType.TYPE_TEXT_VARIATION_NORMAL);
+        root.addView(smsSenders);
 
         root.addView(button("Save", v -> save()));
         root.addView(button("1. Allow notification access", v ->
@@ -73,6 +80,7 @@ public class MainActivity extends Activity {
                 .putString(Prefs.WORKER_URL, workerUrl.getText().toString().trim())
                 .putString(Prefs.TOKEN, token.getText().toString().trim())
                 .putString(Prefs.APP_MATCH, appMatch.getText().toString().trim())
+                .putString(Prefs.SMS_SENDERS, smsSenders.getText().toString().trim())
                 .apply();
         HeartbeatReceiver.schedule(this);
         Toast.makeText(this, "Saved", Toast.LENGTH_SHORT).show();
@@ -84,7 +92,8 @@ public class MainActivity extends Activity {
         Context ctx = getApplicationContext();
         Relay.EXECUTOR.execute(() -> {
             int code = Relay.forward(ctx, "CAER Relay test",
-                    "*** DRILL *** This is a test message from the CAER Relay app.", "CAER Relay", System.currentTimeMillis());
+                    "*** DRILL *** This is a test message from the CAER Relay app.", "CAER Relay", null,
+                    System.currentTimeMillis());
             runOnUiThread(() -> {
                 Toast.makeText(this, "Test: " + Relay.describe(code), Toast.LENGTH_LONG).show();
                 refresh();
@@ -110,8 +119,10 @@ public class MainActivity extends Activity {
         StringBuilder sb = new StringBuilder();
         sb.append("Notification access: ").append(access ? "allowed ✓" : "NOT allowed — tap step 1").append('\n');
         sb.append("Password: ").append(Prefs.token(this).isEmpty() ? "not set" : "set").append('\n');
-        sb.append("Watching: ").append(watched.isEmpty()
-                ? "no matching app has posted yet (looking for \"" + Prefs.appMatch(this) + "\")" : watched).append('\n');
+        sb.append("Forwarded so far: ").append(watched.isEmpty()
+                ? "nothing yet (watching for " + Prefs.appMatch(this)
+                    + (Prefs.smsSenders(this).isEmpty() ? "" : "; texts from " + Prefs.smsSenders(this)) + ")"
+                : watched.replace("|", ", ")).append('\n');
         sb.append("Last forwarded: ").append(Prefs.get(this).getString(Prefs.LAST_FORWARDED, "none yet")).append('\n');
         sb.append("Last delivery: ").append(Prefs.get(this).getString(Prefs.LAST_RESULT, "none yet")).append('\n');
         sb.append("Last heartbeat: ").append(Prefs.get(this).getString(Prefs.LAST_HEARTBEAT, "none yet")).append('\n');

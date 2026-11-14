@@ -30,6 +30,7 @@ const SOURCE_NAMES = {
     houston_fire: 'City of Houston Fire/EMS active incidents',
     police: 'City of Houston Police active incidents',
     traffic: 'Houston TranStar traffic incidents',
+    community: 'Scanner reports & official texts (phone relay)',
 };
 const CAER_APP_URL = 'https://www.ehcma.org/page/caer-online';
 const SOURCE_LINKS = {
@@ -132,7 +133,7 @@ async function fetchJSON(url, { timeout = 20000, headers } = {}) {
 }
 
 // ---------- map ----------
-let map, homeLayer, coneLayer, alertLayer, caerLayer, fireLayer, policeLayer, trafficLayer;
+let map, homeLayer, coneLayer, alertLayer, caerLayer, fireLayer, policeLayer, trafficLayer, scannerLayer;
 const markerById = {};
 
 function initMap() {
@@ -149,11 +150,12 @@ function initMap() {
     fireLayer = L.layerGroup();
     policeLayer = L.layerGroup();
     trafficLayer = L.layerGroup();
+    scannerLayer = L.layerGroup();
     caerLayer = L.layerGroup();
     // Layer switches (top right). Hidden layers are remembered per browser.
     const overlays = {
         'Weather alert areas': alertLayer, 'Road incidents': trafficLayer, 'Police calls': policeLayer,
-        'Fire / EMS calls': fireLayer, 'Industrial (CAER)': caerLayer,
+        'Fire / EMS calls': fireLayer, 'Scanner reports & texts': scannerLayer, 'Industrial (CAER)': caerLayer,
     };
     for (const [name, layer] of Object.entries(overlays)) {
         if (!settings.hiddenLayers.includes(name)) layer.addTo(map);
@@ -194,6 +196,7 @@ function drawMap(status) {
     fireLayer.clearLayers();
     policeLayer.clearLayers();
     trafficLayer.clearLayers();
+    scannerLayer.clearLayers();
     coneLayer.clearLayers();
     alertLayer.clearLayers();
     for (const k of Object.keys(markerById)) delete markerById[k];
@@ -257,6 +260,22 @@ function drawMap(status) {
             i.location_source === 'keymap' ? `Approximate: centre of Key Map square ${i.key_map} (about ¾ mile across)` : null,
         ])).addTo(police ? policeLayer : trafficLayer);
         markerById[i.id] = m;
+    }
+
+    for (const c of status.community || []) {
+        if (c.lat == null) continue;
+        const color = c.level === 'info' ? cssVar('--scanner') : levelColor(c.level);
+        const m = L.circleMarker([c.lat, c.lon], {
+            radius: c.level === 'info' ? 6 : 9, color, weight: 2, fillColor: color,
+            fillOpacity: c.location_approximate ? 0.15 : 0.75, dashArray: c.unconfirmed ? '3 3' : null,
+        }).bindPopup(popupFor(reportTitle(c), [
+            c.text,
+            when(c.reported_at),
+            c.distance_km != null ? `${kmToMi(c.distance_km)} mi ${c.bearing_from_home || ''} of you` : null,
+            c.location_approximate ? `Approximate: centre of ${c.place}` : null,
+            c.unconfirmed ? 'Unconfirmed: AI summary of dispatch radio. Details may be wrong.' : null,
+        ])).addTo(scannerLayer);
+        markerById[c.id] = m;
     }
     updateWindBadge(w);
 }
@@ -362,6 +381,7 @@ function fallbackStatus(nws, pending, backendError) {
         houston_fire: { ok: false, pending, error: backendError },
         police: { ok: false, pending, error: backendError, core: false },
         traffic: { ok: false, pending, error: backendError, core: false },
+        community: { ok: false, pending, error: backendError, core: false },
     };
     const failed = Object.entries(sources).filter(([, s]) => !s.ok && !s.pending && s.core !== false).map(([k]) => SOURCE_NAMES[k]);
     const level = reasons.length ? reasons.reduce((m, r) => (rank(r.level) > rank(m) ? r.level : m), 'clear') : 'clear';
@@ -383,6 +403,7 @@ function fallbackStatus(nws, pending, backendError) {
         fire: [],
         police: [],
         traffic: [],
+        community: [],
     };
 }
 
@@ -471,6 +492,7 @@ function render(status) {
     renderCaer(status);
     renderFire(status);
     renderIncidents(status);
+    renderReports(status);
     handleNotifications(status);
     $('checked-at').textContent = `Checked ${new Date(status.generated_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
     $('location-label').textContent = settings.label;
@@ -711,6 +733,43 @@ function renderIncidents(s) {
         items.push(el('p', { class: 'muted', text: `+ ${shown.length - INCIDENT_LIMIT} more (nearest shown first; all are on the map)` }));
     }
     list.replaceChildren(...notes, ...items);
+}
+
+function reportTitle(c) {
+    const head = c.title || ({ protective: 'Protective action', hazmat: 'Hazmat', major_fire: 'Major fire' }[c.category] || 'Report');
+    return c.kind === 'scanner' ? `Scanner: ${head}` : `${c.app || 'Text'}: ${head}`;
+}
+
+function renderReports(s) {
+    const list = $('report-list');
+    const src = s.sources?.community;
+    const reports = s.community || [];
+    if (src?.pending) { list.replaceChildren(el('p', { class: 'muted', text: 'Loading…' })); $('report-count').textContent = ''; return; }
+    if (!src?.ok) {
+        list.replaceChildren(el('div', { class: 'unavailable' }, 'Not set up. Install the Alert Relay app (see DEPLOYMENT.md) and list CrimeRadar in its settings.'));
+        $('report-count').textContent = '';
+        return;
+    }
+    $('report-count').textContent = `${reports.length} in the last 24 h`;
+    if (!reports.length) {
+        const apps = src.meta?.apps?.length ? ` Apps forwarded so far: ${src.meta.apps.join(', ')}.` : ' Nothing has been forwarded yet from CrimeRadar or texts.';
+        list.replaceChildren(el('p', { class: 'empty', text: `✓ No scanner reports or official texts in the last 24 hours.${apps}` }));
+        return;
+    }
+    list.replaceChildren(...reports.slice(0, INCIDENT_LIMIT).map((c) => el('div', {
+        class: `item lvl-${c.level} src-scanner${c.lat != null ? ' clickable' : ''}`,
+        onclick: c.lat != null ? () => focusOn(c.id) : null,
+    },
+        el('p', { class: 'item-title' },
+            c.level !== 'info' ? [badge(c.level), ' '] : null,
+            el('span', { class: 'badge src-scanner', text: c.unconfirmed ? 'Scanner · unconfirmed' : (c.kind === 'sms' ? 'Text' : (c.app || 'Post')) }),
+            ' ', c.title || c.category),
+        c.text ? el('p', { class: 'item-text', text: truncate(c.text, 300) }) : null,
+        el('p', { class: 'item-meta' },
+            el('span', { text: when(c.reported_at) }),
+            el('span', { text: c.distance_km != null ? `${kmToMi(c.distance_km)} mi ${c.bearing_from_home || ''}${c.location_approximate ? ` (near ${c.place})` : ''}` : (c.place || 'not mapped') }),
+            c.kind === 'sms' && c.app ? el('span', { text: `via ${c.app}` }) : null),
+    )));
 }
 
 const AQI_BANDS = [[50, 'Good'], [100, 'Moderate'], [150, 'Unhealthy for sensitive groups'], [200, 'Unhealthy'], [300, 'Very unhealthy'], [Infinity, 'Hazardous']];

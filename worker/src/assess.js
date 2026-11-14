@@ -9,6 +9,7 @@
 //              incidents, a nearby fire.
 //   clear    - nothing found in the sources that responded.
 import * as caer from './caer.js';
+import * as community from './community.js';
 import { DEFAULT_RADIUS_KM } from './config.js';
 import { DOWNWIND_MAX_KM, downwindExposure, kmToMi, round1 } from './geo.js';
 import * as houston from './houston.js';
@@ -31,6 +32,7 @@ export const SOURCES = {
     houston_fire: ['City of Houston Fire/EMS active incidents', houston.fetchIncidents],
     police: ['City of Houston Police active incidents', houston.fetchPolice],
     traffic: ['Houston TranStar traffic incidents', transtar.fetchIncidents],
+    community: ['Scanner reports & official texts (phone relay)', community.fetchReports],
 };
 // Sources the "is there an emergency" answer depends on. Police and traffic are
 // shown for awareness; if they are down the verdict isn't marked incomplete.
@@ -120,6 +122,19 @@ export function build(lat, lon, results, { radiusKm = DEFAULT_RADIUS_KM, label =
         });
     }
 
+    const reports = results.community?.data || [];
+    for (const c of reports) {
+        if (c.level === 'info') continue;
+        const scanner = c.kind === 'scanner';
+        reasons.push({
+            id: c.id, level: c.level, source: scanner ? 'Scanner' : (c.app || 'Relay'),
+            title: scanner ? `Scanner report (unconfirmed): ${c.title || c.category}` : (c.title || 'Official message'),
+            detail: c.text, note: scanner ? 'AI summary of dispatch radio; details may be wrong until confirmed' : null,
+            instruction: null, time: c.reported_at, expires: null,
+            distance_mi: c.distance_km == null ? null : mi(c.distance_km), direction: c.bearing_from_home, url: null,
+        });
+    }
+
     for (const f of fires) {
         if (f.level === 'info' || f.distance_km == null || f.distance_km > radiusKm) continue;
         reasons.push({
@@ -158,6 +173,7 @@ export function build(lat, lon, results, { radiusKm = DEFAULT_RADIUS_KM, label =
         fire: fires,
         police,
         traffic,
+        community: reports,
     };
 }
 

@@ -73,6 +73,7 @@
                         <span><i class="dot lvl-info"></i>Routine fire</span>
                         <span><i class="dot police"></i>Police call</span>
                         <span><i class="dot traffic"></i>Road incident</span>
+                        <span><i class="dot scanner"></i>Scanner / text</span>
                         <span><i class="cone"></i>Downwind</span>
                     </div>
                 </div>
@@ -125,6 +126,15 @@
                 <label class="switch small"><input type="checkbox" id="show-all-incidents"> Show region-wide</label>
                 <div class="list" id="incident-list"><p class="muted">Loading…</p></div>
                 <p class="fineprint">Shown for awareness. Police calls are City of Houston only (Baytown, Harris County Sheriff and unincorporated areas like Highlands and Channelview don't publish theirs). Road incidents cover TranStar-monitored freeways and major roads across the region (I-10, Beltway 8, SH 146, SH 225, I-610 and more). Only hazardous-material incidents near you change the alert level above.</p>
+            </section>
+
+            <section class="card" id="report-card">
+                <div class="card-head">
+                    <h3>Scanner reports &amp; official texts <small>relayed from your phone</small></h3>
+                    <span class="count" id="report-count"></span>
+                </div>
+                <div class="list" id="report-list"><p class="muted">Loading…</p></div>
+                <p class="fineprint">Scanner reports come from a scanner-alert app (such as CrimeRadar) that turns dispatch radio into written alerts with AI. They are first reports: addresses can be misheard and incidents can turn out to be nothing, so they can raise the level above to "advisory" at most. Texts come only from the senders you list in the relay app; a shelter-in-place or evacuation text raises a warning. Reports naming only a community are placed at its centre (hollow markers).</p>
             </section>
 
             <section class="card resources">

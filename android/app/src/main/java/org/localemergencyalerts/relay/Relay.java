@@ -73,12 +73,13 @@ final class Relay {
     }
 
     /** Forward one notification (runs on the caller's thread). */
-    static int forward(Context ctx, String title, String text, String app, long postedAt) {
+    static int forward(Context ctx, String title, String text, String app, String pkg, long postedAt) {
         JSONObject body = new JSONObject();
         try {
             body.put("title", title);
             body.put("text", text);
             body.put("app", app);
+            if (pkg != null) body.put("package", pkg);
             body.put("time", postedAt);
         } catch (JSONException ignored) {
             // JSONObject.put only throws for non-finite numbers

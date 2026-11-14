@@ -18,6 +18,7 @@ import * as houston from './houston.js';
 import { TTLCache, clean, getJson, htmlToText } from './http.js';
 import * as keymap from './keymap.js';
 import * as relay from './relay.js';
+import * as community from './community.js';
 import { runMonitor } from './monitor.js';
 
 const CORS = {
@@ -237,7 +238,7 @@ async function ingestRoute(request, env, url) {
         return json({ error: 'could not read request body' }, 400);
     }
     if (url.searchParams.get('heartbeat')) payload = { heartbeat: true };
-    const result = await relay.ingest(env.STATE, payload);
+    const result = await relay.ingest(env.STATE, payload, Date.now(), { enrich: community.enrich });
     return json(result, result.error ? 400 : 202);
 }
 
@@ -250,6 +251,7 @@ export default {
         }
         if (request.method !== 'GET') return json({ error: 'method not allowed' }, 405);
         caer.setRelayStore(env.STATE);
+        community.setStore(env.STATE);
         switch (url.pathname.replace(/\/+$/, '')) {
             case '/api/status':
                 return status(url.searchParams, env, ctx);
@@ -275,6 +277,7 @@ export default {
 
     async scheduled(event, env, ctx) {
         caer.setRelayStore(env.STATE);
+        community.setStore(env.STATE);
         await geocode.loadPersisted(env.STATE);
         console.log(await runMonitor(env));
         ctx.waitUntil(geocode.savePersisted(env.STATE));

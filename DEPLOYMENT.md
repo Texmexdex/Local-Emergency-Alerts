@@ -60,7 +60,7 @@ The Worker's cron trigger (every 2 minutes) pushes new emergencies to your phone
 
 The Worker's *Logs* tab shows one line per cron run, e.g. `level=clear reasons=0 failed=none sent=0`.
 
-## 4. Plant (CAER) notifications from an Android phone (optional)
+## 4. Plant (CAER) notifications, scanner alerts and texts from an Android phone (optional)
 
 Since Oct 20, 2026 the public CAER web page requires a sign-in, but the **EHCMA CAER Online** app still sends push notifications to residents. A spare Android phone, plugged in on WiFi, can forward each notification it receives to your Worker. They're then classified, located and checked for wind direction like the old feed. This is your own copy of alerts sent to you, so keep it private and don't republish it.
 
@@ -69,14 +69,18 @@ Since Oct 20, 2026 the public CAER web page requires a sign-in, but the **EHCMA 
 3. **On the phone, set up the CAER app:** install **EHCMA CAER Online**, open *Preferences*, turn on push notifications and choose every LEPC location it offers.
 4. **Install the CAER Relay app** (built from `android/` in this repo):
    - On the phone, download `caer-relay.apk` from the repo's **Releases** page (the "CAER Relay (Android)" release), and allow your browser to install unknown apps when Android asks.
-   - Open **CAER Relay**: the Worker address is prefilled; paste your `INGEST_TOKEN` as the relay password and tap **Save**.
+   - Open **Alert Relay** (called CAER Relay before version 2): the Worker address is prefilled; paste your `INGEST_TOKEN` as the relay password and tap **Save**.
    - Tap **1. Allow notification access** and switch CAER Relay on.
    - Tap **2. Don't let Android put this app to sleep** and set CAER Relay to *Unrestricted* / *Don't optimize*.
    - Tap **3. Send a test message**: it should say *delivered*.
-   - It forwards notifications from any app whose name contains "CAER", sends an hourly heartbeat (so the dashboard can tell a quiet phone from an offline one), queues messages while offline, and restarts its heartbeat after a reboot.
+   - It forwards notifications from the apps listed in its settings (default `CAER, CrimeRadar`) and nothing else, sends an hourly heartbeat (so the dashboard can tell a quiet phone from an offline one), queues messages while offline, and restarts its heartbeat after a reboot.
    - Updates are signed with a new key each build for now, so if Android refuses to install an update, uninstall the old CAER Relay first (and re-enter the password).
-5. **No-app alternative:** any forwarder that can send an HTTP POST works: POST the notification to `https://local-emergency-alerts.<subdomain>.workers.dev/api/ingest/notification?token=<your token>` (or send the token as `Authorization: Bearer <token>`) with the notification text as the body (JSON `{"title": ..., "text": ...}` or plain text). Add `&heartbeat=1` for an hourly heartbeat.
-6. **Test from a computer:**
+5. **Scanner alerts and official texts (same app, optional):**
+   - **CrimeRadar** (by TownTalk) turns police/fire dispatch radio into written alerts. Install it, set your area, and allow its notifications. Alert Relay forwards it by default; the alerts appear in the dashboard's *Scanner reports & official texts* card and on the map, marked **unconfirmed**. They can raise the level to *advisory* at most, and only for serious keywords (hazmat, chemical, explosion, plant fire, shelter in place) within 5 mi.
+   - **Ready Harris** isn't an app: sign up at [readyharris.org](https://www.readyharris.org/) for **text** alerts at your address. When the first one arrives, type the sender's name or number exactly as your Messages app shows it into *Forward texts from senders containing* and tap **Save**. Only texts from senders you list are forwarded; a shelter-in-place or evacuation text raises a *warning*.
+   - Other apps: add their name to *Forward these apps* (comma-separated; whole words, so `X` matches the X app but not "Xfinity"). Turn off that app's notifications for anything you don't want forwarded (e.g. DMs).
+6. **No-app alternative:** any forwarder that can send an HTTP POST works: POST the notification to `https://local-emergency-alerts.<subdomain>.workers.dev/api/ingest/notification?token=<your token>` (or send the token as `Authorization: Bearer <token>`) with the notification text as the body (JSON `{"title": ..., "text": ...}` or plain text). Add `&heartbeat=1` for an hourly heartbeat.
+7. **Test from a computer:**
    ```bash
    curl -X POST "https://local-emergency-alerts.<subdomain>.workers.dev/api/ingest/notification" \
      -H "Authorization: Bearer <your token>" -H "Content-Type: application/json" \
